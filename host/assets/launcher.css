@@ -213,7 +213,7 @@ summary:focus-visible {
 .account a {
   text-decoration: none;
 }
-/* Toolbar and filters */
+/* Toolbar */
 .lineup {
   min-height: 55vh;
 }
@@ -244,27 +244,9 @@ input[type="search"] {
   width: 210px;
   background: var(--sunken);
 }
-.segments .filter-count {
-  color: inherit;
-  opacity: 0.7;
-  margin-left: 6px;
-}
-/* App groups and grid cards */
-.group {
-  margin-top: 26px;
-  margin-bottom: 30px;
-}
-.group-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  margin: 0 0 22px;
-  color: var(--faint);
-}
-.group-head h2 {
-  font-weight: 500;
-  font-size: 11px;
-  margin: 0;
+/* App list: grid cards */
+#apps {
+  margin: 18px 0 30px;
 }
 .grid {
   display: grid;
@@ -380,7 +362,6 @@ input[type="search"] {
   letter-spacing: 0.05em;
   white-space: nowrap;
 }
-.status-pill.pending,
 .status-pill.installing {
   color: var(--warning);
 }
@@ -394,6 +375,9 @@ input[type="search"] {
   color: var(--muted);
   margin: 13px 0 15px;
   font-size: 13px;
+}
+.identity + .version {
+  margin-top: 24px;
 }
 /* Open links and app menus */
 .actions {
@@ -480,23 +464,16 @@ input[type="search"] {
   width: 100%;
   border-collapse: collapse;
   border: 1px solid var(--line);
-  min-width: 1010px;
+  min-width: 720px;
   text-align: left;
-  /* Fixed column widths line up the tables of all groups. */
   table-layout: fixed;
 }
 .app-table th:nth-child(1) {
-  width: 31%;
+  width: 46%;
 }
-.app-table th:nth-child(2) {
-  width: 20%;
-}
-.app-table th:nth-child(3),
-.app-table th:nth-child(4) {
-  width: 10%;
-}
-.app-table th:nth-child(5) {
-  width: 12%;
+.app-table th:nth-child(2),
+.app-table th:nth-child(3) {
+  width: 17%;
 }
 .app-table th {
   font: 400 10px var(--mono);
@@ -757,15 +734,6 @@ input[type="search"] {
   }
   .toolbar {
     padding-top: 18px;
-  }
-  .toolbar > .segments {
-    width: 100%;
-  }
-  .toolbar > .segments button {
-    flex: 1;
-    font-size: 9px;
-    padding: 10px 6px;
-    letter-spacing: 0.04em;
   }
   .search-sort {
     width: 100%;

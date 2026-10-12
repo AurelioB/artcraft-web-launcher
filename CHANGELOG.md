@@ -3,6 +3,15 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.2] - 2026-10-12
+
+### Changed
+
+- The launcher shows every enabled app in one list: no Classic/New groups and no
+  Installed/Not installed filters. Apps are numbered in display order; only apps that are not
+  ready show a status ("Installing…", "Not available"), and the table shows App, Version and
+  Released. Which apps appear is decided by enabling or disabling them in `/admin`.
+
 ## [0.2.1] - 2026-10-12
 
 ### Security
@@ -71,6 +80,7 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.2.2]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.2
 [0.2.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.1
 [0.2.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.0
 [0.1.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.1

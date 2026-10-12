@@ -3,10 +3,9 @@ import { initLanguage, t, plural, releaseDate } from "./launcher-i18n.js";
 const COLOR = /^#[0-9a-f]{6}$/i;
 const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
-let catalogue = { apps: [], groups: [] };
+let catalogue = { apps: [] };
 let status = { apps: [], launcher: {} };
 let apps = [];
-let filter = "all";
 let view = preference("craft-launcher-view", "grid", ["grid", "table"]);
 let theme = preference("craft-launcher-theme", "system", ["system", "dark", "light"]);
 let listScroll = 0;
@@ -99,17 +98,15 @@ function identity(app, heading = "h2") {
   node.append(logo(app), text);
   return node;
 }
+// Every listed app is available to open; only apps that are not ready yet carry a badge.
 function statusBadge(app) {
-  let text = "Not available";
-  let state = "failed";
-  if (app.state === "ready") {
-    text = app.pending ? "Update pending" : "Installed · up to date";
-    state = app.pending ? "pending" : "ready";
-  } else if (app.state === "installing") {
-    text = "Installing…";
-    state = "installing";
-  }
-  const badge = el("span", { class: `status-pill ${state}` }, t(text));
+  if (app.state === "ready") return null;
+  const installing = app.state === "installing";
+  const badge = el(
+    "span",
+    { class: `status-pill ${installing ? "installing" : "failed"}` },
+    t(installing ? "Installing…" : "Not available"),
+  );
   if (app.state === "failed" && app.error?.message) {
     badge.title = String(app.error.message)
       .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
@@ -167,7 +164,7 @@ function actions(app) {
   node.append(openButton(app), menu(app));
   return node;
 }
-function card(app) {
+function card(app, index) {
   const node = tint(el("article", { class: "card" }), app);
   const head = el("div", { class: "card-head" });
   const links = el("div", { class: "card-links" });
@@ -175,47 +172,51 @@ function card(app) {
   const repository = repositoryURL(app);
   if (website) links.append(externalLink(website, `${t("Website")} ↗`));
   if (repository) links.append(externalLink(repository, `${t("GitHub")} ↗`));
-  head.append(el("span", { class: "number" }, String(app.order + 1).padStart(2, "0")), links);
+  head.append(el("span", { class: "number" }, String(index + 1).padStart(2, "0")), links);
   const body = el("div", { class: "card-body" });
-  const version = app.active ? t("Version {version}", { version: app.active }) : "—";
-  body.append(
-    identity(app),
-    statusBadge(app),
-    el(
-      "p",
-      { class: "version" },
-      `${version}${app.released ? ` · ${releaseDate(app.released)}` : ""}`,
-    ),
-    actions(app),
-  );
+  body.append(identity(app));
+  const badge = statusBadge(app);
+  if (badge) body.append(badge);
+  if (app.active)
+    body.append(
+      el(
+        "p",
+        { class: "version" },
+        `${t("Version {version}", { version: app.active })}${
+          app.released ? ` · ${releaseDate(app.released)}` : ""
+        }`,
+      ),
+    );
+  body.append(actions(app));
   node.append(head, body);
   return node;
 }
-function table(groupApps) {
+function table(listed) {
   const scroll = el("div", { class: "table-scroll", tabindex: "0", "aria-label": t("Table") });
   const node = el("table", { class: "app-table" });
   const head = el("thead");
   const row = el("tr");
-  for (const label of ["App", "Status", "Installed", "Latest", "Released"])
-    row.append(el("th", { scope: "col" }, t(label, {}, label === "Status" ? "" : "column")));
+  row.append(
+    el("th", { scope: "col" }, t("App", {}, "column")),
+    el("th", { scope: "col" }, t("Version")),
+    el("th", { scope: "col" }, t("Released", {}, "column")),
+  );
   const actionHeading = el("th", { scope: "col" });
   actionHeading.append(el("span", { class: "sr-only" }, "Actions"));
   row.append(actionHeading);
   head.append(row);
   const body = el("tbody");
-  for (const app of groupApps) {
+  for (const app of listed) {
     const tr = tint(el("tr"), app);
     const appCell = el("td", { class: "app-cell" });
     appCell.append(identity(app));
-    const badgeCell = el("td");
-    badgeCell.append(statusBadge(app));
+    const versionCell = el("td", { class: "version-cell" });
+    versionCell.append(statusBadge(app) ?? app.active ?? "—");
     const actionCell = el("td");
     actionCell.append(actions(app));
     tr.append(
       appCell,
-      badgeCell,
-      el("td", { class: "version-cell" }, app.active || "—"),
-      el("td", { class: "version-cell" }, app.latest || "—"),
+      versionCell,
       el("td", { class: "released-cell" }, releaseDate(app.released)),
       actionCell,
     );
@@ -225,43 +226,15 @@ function table(groupApps) {
   scroll.append(node);
   return scroll;
 }
-function renderFilters() {
-  const installed = apps.filter((app) => app.state === "ready").length;
-  const choices = [
-    ["all", t("All"), apps.length],
-    ["installed", t("Installed", {}, "filter"), installed],
-    ["not-installed", t("Not installed"), apps.length - installed],
-  ];
-  const filters = document.getElementById("filters");
-  filters.replaceChildren(
-    ...choices.map(([key, label, count]) => {
-      const button = el(
-        "button",
-        { type: "button", "aria-pressed": String(filter === key) },
-        label,
-      );
-      button.append(" ", el("span", { class: "filter-count" }, count));
-      button.addEventListener("click", () => {
-        filter = key;
-        renderFilters();
-        renderList();
-      });
-      return button;
-    }),
-  );
-}
 function renderList() {
   const search = document.getElementById("search").value.trim().toLocaleLowerCase();
   const sort = document.getElementById("sort").value;
-  const selected = apps.filter(
-    (app) =>
-      (filter === "all" ||
-        (filter === "installed" ? app.state === "ready" : app.state !== "ready")) &&
-      [app.name, app.tagline, tagline(app), app.id].some((value) =>
-        String(value).toLocaleLowerCase().includes(search),
-      ),
+  const listed = apps.filter((app) =>
+    [app.name, app.tagline, tagline(app), app.id].some((value) =>
+      String(value).toLocaleLowerCase().includes(search),
+    ),
   );
-  selected.sort((a, b) =>
+  listed.sort((a, b) =>
     sort === "name"
       ? a.name.localeCompare(b.name, document.documentElement.lang)
       : sort === "newest"
@@ -270,31 +243,13 @@ function renderList() {
   );
   const container = document.getElementById("apps");
   container.replaceChildren();
-  document.getElementById("count").textContent = plural("{n} app|{n} apps", selected.length);
-  if (!selected.length) container.append(el("p", { class: "placeholder" }, t("No apps match")));
-  const groups = [
-    { id: "classic", label: "Classic apps", number: "01" },
-    { id: "new", label: "New apps", number: "02" },
-    { id: "", label: "More apps", number: "03" },
-  ];
-  for (const group of groups) {
-    const groupApps = selected.filter((app) => app.displayGroup === group.id);
-    if (!groupApps.length) continue;
-    const section = el("section", { class: "group" });
-    const head = el("div", { class: "group-head hud-label" });
-    const label = catalogue.groups.find((item) => item.id === group.id)?.label ?? group.label;
-    head.append(
-      el("h2", {}, `${group.number} / ${t(label)}`),
-      el("span", {}, plural("{n} app|{n} apps", groupApps.length)),
-    );
-    section.append(head);
-    if (view === "grid") {
-      const grid = el("div", { class: "grid" });
-      grid.append(...groupApps.map(card));
-      section.append(grid);
-    } else section.append(table(groupApps));
-    container.append(section);
-  }
+  document.getElementById("count").textContent = plural("{n} app|{n} apps", listed.length);
+  if (!listed.length) container.append(el("p", { class: "placeholder" }, t("No apps match")));
+  else if (view === "grid") {
+    const grid = el("div", { class: "grid" });
+    grid.append(...listed.map(card));
+    container.append(grid);
+  } else container.append(table(listed));
   container.setAttribute("aria-busy", "false");
 }
 function renderDetails(app) {
@@ -309,7 +264,9 @@ function renderDetails(app) {
   const name = title(app, "h1");
   name.id = "details-name";
   hero.append(logo(app), name);
-  node.append(back, hero, el("p", { class: "headline" }, details.headline), statusBadge(app));
+  node.append(back, hero, el("p", { class: "headline" }, details.headline));
+  const badge = statusBadge(app);
+  if (badge) node.append(badge);
   const about = el("div", { class: "about" });
   for (const paragraph of details.about ?? []) about.append(el("p", {}, paragraph));
   node.append(about);
@@ -470,11 +427,9 @@ async function load() {
       tagline: app.tagline ?? entry?.app.tagline ?? "",
       catalogue: entry?.app,
       order: entry?.order ?? extraOrder++,
-      displayGroup: entry && ["classic", "new"].includes(entry.app.group) ? entry.app.group : "",
     };
   });
   notices();
-  renderFilters();
   renderList();
   route();
   updateChecked();
@@ -498,7 +453,7 @@ await Promise.all([
       const response = await fetch("launcher/catalog.json");
       if (!response.ok) return;
       const data = await response.json();
-      if (Array.isArray(data.apps) && Array.isArray(data.groups)) catalogue = data;
+      if (Array.isArray(data.apps)) catalogue = data;
     } catch {
       /* Status remains usable when the optional catalogue is unavailable. */
     }
