@@ -60,6 +60,9 @@ function row(app) {
   const tr = el("tr");
   const name = el("td");
   name.append(el("strong", {}, app.name), el("span", { class: "sub" }, `${app.id} · ${app.state}`));
+  if (app.enabled_by === "admin") {
+    name.append(el("span", { class: "sub" }, `${app.enabled ? "enabled" : "disabled"} here (overrides config.toml)`));
+  }
   if (app.error) name.append(el("span", { class: "problem" }, `${app.error.stage}: ${app.error.message}`));
   if (app.blocked.length) name.append(el("span", { class: "sub" }, `blocked: ${app.blocked.join(", ")}`));
 
@@ -81,6 +84,13 @@ function row(app) {
 
   const actions = el("td");
   const box = el("div", { class: "actions" });
+  if (!app.enabled) {
+    // Disabled apps are not served or updated; installed releases are kept.
+    box.append(button("Enable", () => act(app.id, "enable"), { primary: true }));
+    actions.append(box);
+    tr.append(name, active, latest, waiting, policy, checked, actions);
+    return tr;
+  }
   box.append(
     button("Check", () => act(app.id, "check")),
     button("Update now", () => act(app.id, "update"), { primary: app.update_available }),
@@ -92,6 +102,11 @@ function row(app) {
   const older = app.installed.filter((v) => v !== app.active && v !== app.pending);
   if (older.length) box.append(selectWithButton("Roll back", older, (v) => act(app.id, "rollback", v)));
   for (const b of app.blocked) box.append(button(`Allow ${b}`, () => act(app.id, "allow", b)));
+  box.append(
+    button("Disable", () => act(app.id, "disable"), {
+      title: "Stop serving and updating this app; installed releases are kept",
+    }),
+  );
   actions.append(box);
 
   tr.append(name, active, latest, waiting, policy, checked, actions);
@@ -121,7 +136,8 @@ async function load() {
   $("logout").hidden = !data.can_logout;
   $("running").hidden = !busy;
   $("running").textContent = busy ? `Running: ${data.running}` : "";
-  document.querySelector("#apps tbody").replaceChildren(...data.status.apps.filter((a) => a.enabled).map(row));
+  // Disabled apps stay listed so they can be enabled again.
+  document.querySelector("#apps tbody").replaceChildren(...data.status.apps.map(row));
   $("results").replaceChildren(
     ...(data.results.length
       ? data.results.map((r) => logItem(`${when(r.at)} · ${r.user}: ${r.action} ${r.app} — ${r.message}`, r.ok ? "ok" : "failed"))

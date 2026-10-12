@@ -4,7 +4,9 @@
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Component, Path, PathBuf};
+use std::sync::Arc;
 
+use parking_lot::RwLock;
 use regex::Regex;
 use serde::Deserialize;
 
@@ -193,10 +195,17 @@ pub struct AppConfig {
     pub exclude: Vec<String>,
     pub icon: String,
     pub notes: String,
-    /// Launcher metadata: short category, one-line description, brand color (#rrggbb).
+    /// Launcher metadata: short category, one-line description, brand color (#rrggbb), the
+    /// suite group ("classic", "new", or empty), the product page and the colors for text on
+    /// light and dark backgrounds (#rrggbb or empty). Built-in apps take them from the vendored
+    /// ArtCraft Launcher catalogue.
     pub category: String,
     pub tagline: String,
     pub color: String,
+    pub group: String,
+    pub website: String,
+    pub ink_light: String,
+    pub ink_dark: String,
     pub keep_latest: u32,
     pub keep_days: u32,
     /// Optional separate origin (scheme://host[:port]) for this app's links, giving it browser
@@ -204,6 +213,17 @@ pub struct AppConfig {
     pub origin: Option<String>,
     pub activation: Activation,
     pub idle_after_secs: u64,
+}
+
+/// Administrators' enable/disable choices, persisted in each app's state record. Shared by every
+/// clone of a [`Config`], so serving and the updater see a change at once.
+#[derive(Debug, Clone, Default)]
+pub struct Switches(Arc<RwLock<BTreeMap<String, bool>>>);
+
+#[derive(Debug, Clone)]
+pub struct LauncherSettings {
+    /// Base URL of the upstream screenshots (`<base>/<app>/<key>.jpg`); `None` disables them.
+    pub screenshots_url: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -215,13 +235,44 @@ pub struct Config {
     pub server: ServerSettings,
     pub auth: AuthSettings,
     pub admin: AdminSettings,
+    pub launcher: LauncherSettings,
     pub apps: Vec<AppConfig>,
     pub config_file_found: bool,
+    pub switches: Switches,
 }
 
 impl Config {
+    /// Whether the app is served and updated: an administrator's choice, else config.toml.
+    pub fn is_enabled(&self, app: &AppConfig) -> bool {
+        self.switches
+            .0
+            .read()
+            .get(&app.id)
+            .copied()
+            .unwrap_or(app.enabled)
+    }
+
+    /// "admin" when an administrator's choice overrides config.toml, else "config".
+    pub fn enabled_by(&self, app: &AppConfig) -> &'static str {
+        if self.switches.0.read().contains_key(&app.id) {
+            "admin"
+        } else {
+            "config"
+        }
+    }
+
+    /// Record an administrator's choice in memory; `None` follows config.toml again. The caller
+    /// persists it in the app's state record.
+    pub fn set_switch(&self, app_id: &str, enabled: Option<bool>) {
+        let mut map = self.switches.0.write();
+        match enabled {
+            Some(on) => map.insert(app_id.to_string(), on),
+            None => map.remove(app_id),
+        };
+    }
+
     pub fn enabled_apps(&self) -> impl Iterator<Item = &AppConfig> {
-        self.apps.iter().filter(|a| a.enabled)
+        self.apps.iter().filter(|a| self.is_enabled(a))
     }
 
     pub fn app(&self, id: &str) -> Result<&AppConfig, ConfigError> {
@@ -285,8 +336,15 @@ struct RawFile {
     server: Option<RawServer>,
     auth: Option<RawAuth>,
     admin: Option<RawAdmin>,
+    launcher: Option<RawLauncher>,
     #[serde(default)]
     apps: toml::Table,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawLauncher {
+    screenshots_url: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -545,29 +603,19 @@ fn build_app(
     problems: &mut Vec<String>,
 ) -> Option<AppConfig> {
     let w = |k: &str| format!("[apps.{id}] {k}");
-    let mut missing = false;
-    for (key, present) in [
-        ("name", raw.name.is_some()),
-        ("repository", raw.repository.is_some()),
-        (
-            "artifact_patterns",
-            raw.artifact_patterns
-                .as_ref()
-                .is_some_and(|v| !v.is_empty()),
-        ),
-    ] {
-        if !present {
-            problems.push(format!(
-                "{}: required for apps that are not in the built-in manifest",
-                w(key)
-            ));
-            missing = true;
-        }
-    }
-    if missing {
+    let cat = crate::catalog::app(id);
+    let Some(name) = raw.name.or_else(|| cat.map(|c| c.name.clone())) else {
+        problems.push(format!(
+            "{}: required for apps that are not in the built-in manifest or the Craft App catalogue",
+            w("name")
+        ));
         return None;
-    }
-    let repository = raw.repository.unwrap();
+    };
+    // The suite's convention: repository `storytold/<id>`, web archive `<id>-web-<version>.zip`,
+    // and the same for every former name of the app.
+    let repository = raw
+        .repository
+        .unwrap_or_else(|| cat.map_or_else(|| format!("storytold/{id}"), |c| c.repository.clone()));
     let repo_re = Regex::new(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").unwrap();
     if !repo_re.is_match(&repository) {
         problems.push(format!(
@@ -617,7 +665,18 @@ fn build_app(
     let release_dir = relative_components(&release_dir)
         .map(|p| p.join("/"))
         .unwrap_or(release_dir);
-    let patterns = raw.artifact_patterns.unwrap();
+    let patterns = raw.artifact_patterns.unwrap_or_else(|| {
+        std::iter::once(id)
+            .chain(
+                cat.iter()
+                    .flat_map(|c| c.former_ids.iter().map(String::as_str)),
+            )
+            .map(|stem| format!("{stem}-web-{{version}}.zip"))
+            .collect()
+    });
+    if patterns.is_empty() {
+        problems.push(format!("{}: must not be empty", w("artifact_patterns")));
+    }
     for p in &patterns {
         if p.matches("{version}").count() != 1 || p.contains('/') {
             problems.push(format!(
@@ -684,9 +743,14 @@ fn build_app(
         updater.idle_after_secs,
         problems,
     );
+    let presentation =
+        |own: Option<String>, upstream: fn(&crate::catalog::CatalogApp) -> &String| {
+            own.or_else(|| cat.map(|c| upstream(c).clone()))
+                .unwrap_or_default()
+        };
     Some(AppConfig {
         id: id.to_string(),
-        name: raw.name.unwrap(),
+        name,
         repository,
         artifact_patterns: patterns,
         checksum_assets: raw
@@ -702,8 +766,16 @@ fn build_app(
         icon,
         notes: raw.notes.unwrap_or_default(),
         category: raw.category.unwrap_or_default(),
-        tagline: raw.tagline.unwrap_or_default(),
-        color,
+        tagline: presentation(raw.tagline, |c| &c.tagline),
+        color: if color.is_empty() {
+            presentation(None, |c| &c.color)
+        } else {
+            color
+        },
+        group: presentation(None, |c| &c.group),
+        website: presentation(None, |c| &c.website),
+        ink_light: presentation(None, |c| &c.ink_light),
+        ink_dark: presentation(None, |c| &c.ink_dark),
         keep_latest: raw.keep_latest.unwrap_or(retention.keep_latest),
         keep_days: raw.keep_days.unwrap_or(retention.keep_days),
         origin,
@@ -1089,8 +1161,24 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         &admin,
         &mut problems,
     );
+    let launcher = build_launcher(raw.launcher.unwrap_or_default(), &mut problems);
     if !problems.is_empty() {
         return Err(ConfigError(problems));
+    }
+    let switches = Switches::default();
+    {
+        // An unreadable record shows up in status; its app follows config.toml meanwhile.
+        let store = crate::store::Store::new(&paths.state);
+        let mut map = switches.0.write();
+        for app in &apps {
+            if let Ok(crate::store::AppState {
+                enabled: Some(on), ..
+            }) = store.load(&app.id)
+                && on != app.enabled
+            {
+                map.insert(app.id.clone(), on);
+            }
+        }
     }
     Ok(Config {
         paths,
@@ -1100,9 +1188,28 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         server,
         auth,
         admin,
+        launcher,
         apps,
         config_file_found: found,
+        switches,
     })
+}
+
+fn build_launcher(raw: RawLauncher, problems: &mut Vec<String>) -> LauncherSettings {
+    let url = raw
+        .screenshots_url
+        .unwrap_or_else(crate::catalog::default_screenshots_url)
+        .trim()
+        .trim_end_matches('/')
+        .to_string();
+    if !url.is_empty() && !url.starts_with("https://") && !url.starts_with("http://") {
+        problems.push(format!(
+            "[launcher] screenshots_url: {url:?} must be an http(s) URL, or \"\" to turn screenshots off"
+        ));
+    }
+    LauncherSettings {
+        screenshots_url: (!url.is_empty()).then_some(url),
+    }
 }
 
 #[cfg(test)]
@@ -1121,22 +1228,22 @@ mod tests {
     }
 
     fn load(text: &str) -> Result<Config, ConfigError> {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("config.toml");
-        std::fs::write(&file, text).unwrap();
-        let mut p = paths_with(&file);
-        p.data = dir.path().join("data");
-        p.state = dir.path().join("state");
-        p.cache = dir.path().join("cache");
-        p.work = dir.path().join("work");
-        p.config_file = dir.path().join("config/config.toml");
-        std::fs::create_dir_all(dir.path().join("config")).unwrap();
+        load_in(tempfile::tempdir().unwrap().path(), text)
+    }
+
+    fn load_in(dir: &Path, text: &str) -> Result<Config, ConfigError> {
+        let mut p = paths_with(&dir.join("config/config.toml"));
+        p.data = dir.join("data");
+        p.state = dir.join("state");
+        p.cache = dir.join("cache");
+        p.work = dir.join("work");
+        std::fs::create_dir_all(dir.join("config")).unwrap();
         std::fs::write(&p.config_file, text).unwrap();
         load_config(p)
     }
 
     #[test]
-    fn defaults_include_all_seven_apps_in_manifest_order() {
+    fn built_in_apps_follow_the_suite_conventions_and_catalogue() {
         let cfg = load("").unwrap();
         let ids: Vec<_> = cfg.apps.iter().map(|a| a.id.as_str()).collect();
         assert_eq!(
@@ -1148,13 +1255,69 @@ mod tests {
                 "lightcraft",
                 "pdfcraft",
                 "effectcraft",
-                "designcraft"
+                "designcraft",
+                "wordcraft",
+                "deckcraft",
+                "gridcraft",
+                "cadcraft",
+                "soundcraft"
             ]
         );
+        assert_eq!(cfg.enabled_apps().count(), 12);
         let pdf = cfg.app("pdfcraft").unwrap();
-        assert_eq!(pdf.repository, "storytold/printcraft");
+        assert_eq!(pdf.repository, "storytold/pdfcraft");
+        assert_eq!(
+            pdf.artifact_patterns,
+            ["pdfcraft-web-{version}.zip", "printcraft-web-{version}.zip"]
+        );
         assert_eq!(pdf.release_dir, "releases/pdfcraft");
+        assert_eq!(pdf.tagline, "Reading, organizing and protecting PDFs");
+        assert_eq!(
+            (
+                pdf.group.as_str(),
+                pdf.color.as_str(),
+                pdf.ink_dark.as_str()
+            ),
+            ("classic", "#12a58a", "#3fd6b8")
+        );
+        let word = cfg.app("wordcraft").unwrap();
+        assert_eq!(
+            (
+                word.name.as_str(),
+                word.repository.as_str(),
+                word.group.as_str()
+            ),
+            ("WordCraft", "storytold/wordcraft", "new")
+        );
+        assert_eq!(word.artifact_patterns, ["wordcraft-web-{version}.zip"]);
+        assert_eq!(word.website, "https://getartcraft.com/apps/wordcraft");
         assert_eq!(cfg.updater.check_interval_secs, 3600);
+    }
+
+    #[test]
+    fn admin_choices_override_config_until_they_agree_again() {
+        let dir = tempfile::tempdir().unwrap();
+        let state = |app: &str, json: &str| {
+            std::fs::create_dir_all(dir.path().join("state/apps")).unwrap();
+            std::fs::write(dir.path().join(format!("state/apps/{app}.json")), json).unwrap();
+        };
+        state("cadcraft", r#"{"enabled": false}"#);
+        state("lightcraft", r#"{"enabled": true}"#);
+        // A choice equal to config.toml is no override.
+        state("filmcraft", r#"{"enabled": true}"#);
+        let cfg = load_in(dir.path(), "[apps.lightcraft]\nenabled = false\n").unwrap();
+        let at = |id: &str| {
+            let a = cfg.app(id).unwrap();
+            (cfg.is_enabled(a), cfg.enabled_by(a))
+        };
+        assert_eq!(at("cadcraft"), (false, "admin"));
+        assert_eq!(at("lightcraft"), (true, "admin"));
+        assert_eq!(at("filmcraft"), (true, "config"));
+        assert!(!cfg.enabled_apps().any(|a| a.id == "cadcraft"));
+        // A change is visible to every clone (server and updater share it) at once.
+        let shared = cfg.clone();
+        cfg.set_switch("cadcraft", None);
+        assert!(shared.is_enabled(shared.app("cadcraft").unwrap()));
     }
 
     #[test]
@@ -1342,20 +1505,40 @@ entry = "effectcraft"
     }
 
     #[test]
-    fn custom_apps_need_a_definition() {
+    fn custom_apps_need_a_name_and_default_to_the_suite_conventions() {
         let err = load("[apps.newcraft]\nenabled = true\n").unwrap_err();
         assert!(
-            err.0
-                .join("\n")
-                .contains("[apps.newcraft] repository: required"),
+            err.0.join("\n").contains("[apps.newcraft] name: required"),
             "{:?}",
             err.0
         );
+        let cfg = load("[apps.newcraft]\nname = \"NewCraft\"\n").unwrap();
+        let app = cfg.app("newcraft").unwrap();
+        assert_eq!(
+            (
+                app.repository.as_str(),
+                app.entry.as_str(),
+                app.group.as_str()
+            ),
+            ("storytold/newcraft", "newcraft", "")
+        );
+        assert_eq!(app.artifact_patterns, ["newcraft-web-{version}.zip"]);
         let cfg = load(
-            "[apps.newcraft]\nname = \"NewCraft\"\nrepository = \"storytold/newcraft\"\nartifact_patterns = [\"newcraft-web-{version}.zip\"]\n",
+            "[apps.mine]\nname = \"Mine\"\nrepository = \"me/mine\"\nartifact_patterns = [\"site-{version}.zip\"]\ncolor = \"#123456\"\n",
         )
         .unwrap();
-        assert_eq!(cfg.app("newcraft").unwrap().entry, "newcraft");
+        let app = cfg.app("mine").unwrap();
+        assert_eq!(
+            (app.repository.as_str(), app.color.as_str()),
+            ("me/mine", "#123456")
+        );
+        assert_eq!(app.artifact_patterns, ["site-{version}.zip"]);
+        let err = load("[apps.mine]\nname = \"Mine\"\nartifact_patterns = []\n").unwrap_err();
+        assert!(
+            err.0[0].contains("artifact_patterns: must not be empty"),
+            "{:?}",
+            err.0
+        );
     }
 
     #[test]

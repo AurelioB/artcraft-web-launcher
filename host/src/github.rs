@@ -203,7 +203,7 @@ enum Attempt<T> {
     Fail(NetError),
 }
 
-fn agent(timeout_global: u64, connect: u64) -> ureq::Agent {
+pub(crate) fn agent(timeout_global: u64, connect: u64) -> ureq::Agent {
     ureq::Agent::config_builder()
         .http_status_as_error(false)
         .timeout_connect(Some(Duration::from_secs(connect)))
@@ -512,6 +512,10 @@ mod tests {
             category: String::new(),
             tagline: String::new(),
             color: String::new(),
+            group: String::new(),
+            website: String::new(),
+            ink_light: String::new(),
+            ink_dark: String::new(),
             keep_latest: 3,
             keep_days: 30,
             origin: None,

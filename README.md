@@ -1,10 +1,12 @@
 # Craft Apps Host
 
-Run the seven official Craft browser apps on your own server: PhotoCraft, VectorCraft,
-FilmCraft, LightCraft, PdfCraft, EffectCraft and DesignCraft. A launcher at `/` links to
-each app. `craft-host` downloads official GitHub releases and checks for updates in the
-background; app updates do not require a new container image. Optional sign-in provides
-`user` and `admin` roles and an administration interface at `/admin/`.
+Run the twelve official Craft browser apps on your own server: PhotoCraft, VectorCraft,
+FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, WordCraft, DeckCraft, GridCraft,
+CADCraft and SoundCraft. A launcher at `/`, styled after the official ArtCraft Launcher, lists
+them in a grid or table with app pages and the launcher's translations. `craft-host`
+downloads official GitHub releases and checks for updates in the background; app updates do
+not require a new container image. Optional sign-in provides `user` and `admin` roles and an
+administration interface at `/admin/`.
 
 The apps run in your browser. The host serves app files, **not documents**: it does not
 provide server-side document storage, sharing or synchronization, and the apps cannot
@@ -15,8 +17,11 @@ browse folders on the server.
   versions are available at `/photocraft/<version>/`.
 - Background checks continue on a per-app schedule across restarts. Updates are
   checksum-verified and can activate immediately or after an idle period.
-- `/admin/` can check, update, apply, pin, roll back and manage users. It is disabled
-  by default; the launcher and apps are public by default.
+- `/admin/` can check, update, apply, pin, roll back, enable and disable apps and manage
+  users. It is disabled by default; the launcher and apps are public by default.
+- Every app is installed automatically unless an administrator disables it. Craft apps added
+  later need only an `[apps.<id>]` section with a name: repository and archive names follow
+  the suite's conventions.
 - Local accounts, OpenID Connect, HTTP Basic and trusted reverse-proxy sign-in are
   supported. No Docker socket, privileged container, GPU or database server is needed.
 

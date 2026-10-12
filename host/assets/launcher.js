@@ -1,89 +1,416 @@
-// Renders the app lineup from status.json (published by the updater). All text is inserted with
-// textContent; status values are never interpreted as HTML.
+import { initLanguage, t, plural, releaseDate } from "./launcher-i18n.js";
 
-const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
 const COLOR = /^#[0-9a-f]{6}$/i;
+const REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const HEARTBEAT_STALE_MS = 10 * 60 * 1000;
+let catalogue = { apps: [], groups: [] };
+let status = { apps: [], launcher: {} };
+let apps = [];
+let filter = "all";
+let view = preference("craft-launcher-view", "grid", ["grid", "table"]);
+let theme = preference("craft-launcher-theme", "system", ["system", "dark", "light"]);
+let listScroll = 0;
+let showingDetails = false;
 
+function preference(key, fallback, choices) {
+  try {
+    const value = localStorage.getItem(key);
+    return choices.includes(value) ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function persist(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* Storage may be disabled. */
+  }
+}
 function el(tag, attrs = {}, text) {
   const node = document.createElement(tag);
-  for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  for (const [key, value] of Object.entries(attrs)) node.setAttribute(key, value);
   if (text !== undefined) node.textContent = text;
   return node;
 }
-
-function hue(id) {
-  let h = 0;
-  for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 360;
-  return h;
+function safeURL(value) {
+  if (typeof value !== "string" || !value) return null;
+  try {
+    const url = new URL(value, document.baseURI);
+    return url.protocol === "https:" || (url.origin === location.origin && url.protocol === "http:")
+      ? url.href
+      : null;
+  } catch {
+    return null;
+  }
 }
-
-function logo(app) {
-  if (app.icon) return el("img", { class: "logo", src: app.icon, alt: "", width: "72", height: "72", decoding: "async" });
-  return el("span", { class: "logo monogram", "aria-hidden": "true" }, app.name.slice(0, 1));
+function repositoryURL(app) {
+  return REPOSITORY.test(app.repository) ? `https://github.com/${app.repository}` : null;
 }
-
-// "PhotoCraft" → "Photo" + accented "Craft", as on getartcraft.com.
-function title(app) {
-  const h = el("h2", { class: "name font-display" });
-  const m = /^(.+?)(Craft)$/.exec(app.name);
-  if (m) h.append(m[1], el("span", { class: "accent" }, m[2]));
-  else h.textContent = app.name;
-  return h;
+function websiteURL(app) {
+  return typeof app.website === "string" && app.website.startsWith("https://")
+    ? safeURL(app.website)
+    : null;
 }
-
-function badges(app) {
-  const list = el("ul", { class: "badges" });
-  const add = (text, cls = "") => list.append(el("li", cls ? { class: cls } : {}, text));
-  if (app.state === "ready") add(`v${app.active}`);
-  else if (app.state === "installing") add("Installing", "state");
-  else if (app.state === "failed") add("Install failed", "state failed");
-  if (app.pinned) add("Pinned");
-  if (app.pending) add(`v${app.pending} queued`);
-  else if (app.update_available && app.latest) add(`v${app.latest} available`);
-  return list;
+function externalLink(href, label) {
+  return el("a", { href, target: "_blank", rel: "noopener noreferrer" }, label);
 }
-
-function notes(app) {
-  const out = [];
-  if (app.state === "installing") out.push("Being installed; this page refreshes when it is ready.");
-  if (app.state === "failed") out.push("Not available yet: the first installation failed.");
-  if (app.pending) out.push(`Version ${app.pending} is downloaded and takes over after a quiet period with no visits to this app.`);
-  if (app.error) out.push(`Last update problem (${app.error.stage}): ${app.error.message}`);
-  return out.map((t) => el("p", { class: "note" }, t));
-}
-
-function card(app, index) {
-  const ready = app.state === "ready";
-  const node = ready ? el("a", { class: "app", href: app.url }) : el("div", { class: "app unavailable", "aria-disabled": "true" });
-  node.style.setProperty("--app", COLOR.test(app.color) ? app.color : `hsl(${hue(app.id)} 60% 50%)`);
-
-  const head = el("div", { class: "card-head" });
-  head.append(el("span", { class: "tag" }, String(index + 1).padStart(2, "0")));
-  if (app.category) head.append(el("span", { class: "hud-label" }, app.category));
-  node.append(head, logo(app), title(app));
-  if (app.tagline) node.append(el("p", { class: "tagline" }, app.tagline));
-  node.append(badges(app), ...notes(app));
-  node.append(el("span", { class: "open hud-label" }, ready ? `Open ${app.name} →` : "Not available yet"));
+function tint(node, app) {
+  const color = COLOR.test(app.color) ? app.color : "#808080";
+  node.classList.add("app-tint");
+  node.style.setProperty("--app", color);
+  node.style.setProperty("--app-light", COLOR.test(app.ink_light) ? app.ink_light : color);
+  node.style.setProperty("--app-dark", COLOR.test(app.ink_dark) ? app.ink_dark : color);
   return node;
 }
-
-function notices(status) {
+function logo(app) {
+  const fallback = () =>
+    el("span", { class: "logo monogram", "aria-hidden": "true" }, app.name.slice(0, 1));
+  const src = safeURL(app.icon);
+  if (!src) return fallback();
+  const image = el("img", {
+    class: "logo",
+    src,
+    alt: "",
+    width: "56",
+    height: "56",
+    decoding: "async",
+  });
+  image.addEventListener("error", () => image.replaceWith(fallback()), { once: true });
+  return image;
+}
+function title(app, tag = "h2") {
+  const node = el(tag, { class: "name" });
+  const parts = /^(.+?)(Craft)$/.exec(app.name);
+  if (parts) node.append(parts[1], el("span", { class: "accent" }, parts[2]));
+  else node.textContent = app.name;
+  return node;
+}
+function tagline(app) {
+  // Only catalogue apps with their original English tagline have contextual translations.
+  return app.catalogue && app.tagline === app.catalogue.tagline
+    ? t(app.tagline, {}, app.id)
+    : app.tagline;
+}
+function identity(app, heading = "h2") {
+  const node = el("div", { class: "identity" });
+  const text = el("div", { class: "identity-text" });
+  text.append(title(app, heading), el("p", { class: "tagline" }, tagline(app)));
+  node.append(logo(app), text);
+  return node;
+}
+function statusBadge(app) {
+  let text = "Not available";
+  let state = "failed";
+  if (app.state === "ready") {
+    text = app.pending ? "Update pending" : "Installed · up to date";
+    state = app.pending ? "pending" : "ready";
+  } else if (app.state === "installing") {
+    text = "Installing…";
+    state = "installing";
+  }
+  const badge = el("span", { class: `status-pill ${state}` }, t(text));
+  if (app.state === "failed" && app.error?.message) {
+    badge.title = String(app.error.message)
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+      .slice(0, 1000);
+  }
+  return badge;
+}
+function openButton(app) {
+  const href = app.state === "ready" ? safeURL(app.url) : null;
+  if (href) return el("a", { class: "primary", href }, t("Open"));
+  return el("span", { class: "primary disabled", "aria-disabled": "true" }, t("Open"));
+}
+function appLinks(app, releaseNotes = true) {
+  const links = [];
+  const repository = repositoryURL(app);
+  if (repository) {
+    if (releaseNotes && app.release_tag)
+      links.push(
+        externalLink(
+          `${repository}/releases/tag/${encodeURIComponent(app.release_tag)}`,
+          t("Release notes"),
+        ),
+      );
+    if (releaseNotes) links.push(externalLink(`${repository}/releases`, t("All releases")));
+    else links.push(externalLink(repository, `${t("GitHub")} ↗`));
+  }
+  const website = websiteURL(app);
+  if (website) links.push(externalLink(website, releaseNotes ? t("Website") : `${t("Website")} ↗`));
+  return links;
+}
+function menu(app) {
+  const node = el("details", { class: "menu" });
+  const summary = el("summary", { "aria-label": t("{name} details", { name: app.name }) }, "…");
+  const items = el("div", { class: "menu-items" });
+  if (app.catalogue?.details)
+    items.append(
+      el(
+        "a",
+        { href: `#app/${encodeURIComponent(app.id)}` },
+        t("{name} details", { name: app.name }),
+      ),
+    );
+  items.append(...appLinks(app));
+  node.append(summary, items);
+  node.addEventListener("toggle", () => {
+    if (node.open)
+      document.querySelectorAll("details.menu[open]").forEach((other) => {
+        if (other !== node) other.open = false;
+      });
+  });
+  return node;
+}
+function actions(app) {
+  const node = el("div", { class: "actions" });
+  node.append(openButton(app), menu(app));
+  return node;
+}
+function card(app) {
+  const node = tint(el("article", { class: "card" }), app);
+  const head = el("div", { class: "card-head" });
+  const links = el("div", { class: "card-links" });
+  const website = websiteURL(app);
+  const repository = repositoryURL(app);
+  if (website) links.append(externalLink(website, `${t("Website")} ↗`));
+  if (repository) links.append(externalLink(repository, `${t("GitHub")} ↗`));
+  head.append(el("span", { class: "number" }, String(app.order + 1).padStart(2, "0")), links);
+  const body = el("div", { class: "card-body" });
+  const version = app.active ? t("Version {version}", { version: app.active }) : "—";
+  body.append(
+    identity(app),
+    statusBadge(app),
+    el(
+      "p",
+      { class: "version" },
+      `${version}${app.released ? ` · ${releaseDate(app.released)}` : ""}`,
+    ),
+    actions(app),
+  );
+  node.append(head, body);
+  return node;
+}
+function table(groupApps) {
+  const scroll = el("div", { class: "table-scroll", tabindex: "0", "aria-label": t("Table") });
+  const node = el("table", { class: "app-table" });
+  const head = el("thead");
+  const row = el("tr");
+  for (const label of ["App", "Status", "Installed", "Latest", "Released"])
+    row.append(el("th", { scope: "col" }, t(label, {}, label === "Status" ? "" : "column")));
+  const actionHeading = el("th", { scope: "col" });
+  actionHeading.append(el("span", { class: "sr-only" }, "Actions"));
+  row.append(actionHeading);
+  head.append(row);
+  const body = el("tbody");
+  for (const app of groupApps) {
+    const tr = tint(el("tr"), app);
+    const appCell = el("td", { class: "app-cell" });
+    appCell.append(identity(app));
+    const badgeCell = el("td");
+    badgeCell.append(statusBadge(app));
+    const actionCell = el("td");
+    actionCell.append(actions(app));
+    tr.append(
+      appCell,
+      badgeCell,
+      el("td", { class: "version-cell" }, app.active || "—"),
+      el("td", { class: "version-cell" }, app.latest || "—"),
+      el("td", { class: "released-cell" }, releaseDate(app.released)),
+      actionCell,
+    );
+    body.append(tr);
+  }
+  node.append(head, body);
+  scroll.append(node);
+  return scroll;
+}
+function renderFilters() {
+  const installed = apps.filter((app) => app.state === "ready").length;
+  const choices = [
+    ["all", t("All"), apps.length],
+    ["installed", t("Installed", {}, "filter"), installed],
+    ["not-installed", t("Not installed"), apps.length - installed],
+  ];
+  const filters = document.getElementById("filters");
+  filters.replaceChildren(
+    ...choices.map(([key, label, count]) => {
+      const button = el(
+        "button",
+        { type: "button", "aria-pressed": String(filter === key) },
+        label,
+      );
+      button.append(" ", el("span", { class: "filter-count" }, count));
+      button.addEventListener("click", () => {
+        filter = key;
+        renderFilters();
+        renderList();
+      });
+      return button;
+    }),
+  );
+}
+function renderList() {
+  const search = document.getElementById("search").value.trim().toLocaleLowerCase();
+  const sort = document.getElementById("sort").value;
+  const selected = apps.filter(
+    (app) =>
+      (filter === "all" ||
+        (filter === "installed" ? app.state === "ready" : app.state !== "ready")) &&
+      [app.name, app.tagline, tagline(app), app.id].some((value) =>
+        String(value).toLocaleLowerCase().includes(search),
+      ),
+  );
+  selected.sort((a, b) =>
+    sort === "name"
+      ? a.name.localeCompare(b.name, document.documentElement.lang)
+      : sort === "newest"
+        ? (Date.parse(b.released) || 0) - (Date.parse(a.released) || 0) || a.order - b.order
+        : a.order - b.order,
+  );
+  const container = document.getElementById("apps");
+  container.replaceChildren();
+  document.getElementById("count").textContent = plural("{n} app|{n} apps", selected.length);
+  if (!selected.length) container.append(el("p", { class: "placeholder" }, t("No apps match")));
+  const groups = [
+    { id: "classic", label: "Classic apps", number: "01" },
+    { id: "new", label: "New apps", number: "02" },
+    { id: "", label: "More apps", number: "03" },
+  ];
+  for (const group of groups) {
+    const groupApps = selected.filter((app) => app.displayGroup === group.id);
+    if (!groupApps.length) continue;
+    const section = el("section", { class: "group" });
+    const head = el("div", { class: "group-head hud-label" });
+    const label = catalogue.groups.find((item) => item.id === group.id)?.label ?? group.label;
+    head.append(
+      el("h2", {}, `${group.number} / ${t(label)}`),
+      el("span", {}, plural("{n} app|{n} apps", groupApps.length)),
+    );
+    section.append(head);
+    if (view === "grid") {
+      const grid = el("div", { class: "grid" });
+      grid.append(...groupApps.map(card));
+      section.append(grid);
+    } else section.append(table(groupApps));
+    container.append(section);
+  }
+  container.setAttribute("aria-busy", "false");
+}
+function renderDetails(app) {
+  const details = app.catalogue.details;
+  const node = tint(el("div", { class: "details" }), app);
+  const back = el(
+    "a",
+    { class: "back-link hud-label", href: "#", "aria-label": t("Close") },
+    `← ${t("Close")}`,
+  );
+  const hero = el("div", { class: "details-hero" });
+  const name = title(app, "h1");
+  name.id = "details-name";
+  hero.append(logo(app), name);
+  node.append(back, hero, el("p", { class: "headline" }, details.headline), statusBadge(app));
+  const about = el("div", { class: "about" });
+  for (const paragraph of details.about ?? []) about.append(el("p", {}, paragraph));
+  node.append(about);
+  if (details.features?.length) {
+    node.append(el("h2", { class: "details-heading hud-label" }, t("Features")));
+    const features = el("div", { class: "features" });
+    for (const feature of details.features) {
+      const item = el("section", { class: "feature" });
+      item.append(el("h3", {}, feature.title), el("p", {}, feature.text));
+      features.append(item);
+    }
+    node.append(features);
+  }
+  if (status.launcher?.screenshots && /^[A-Za-z0-9_-]+$/.test(app.id) && details.shots?.length) {
+    const gallery = el("div", { class: "gallery" });
+    for (const shot of details.shots) {
+      if (!/^[A-Za-z0-9_-]+$/.test(shot.key)) continue;
+      const figure = el("figure");
+      const image = el("img", {
+        src: `launcher/shots/${app.id}/${shot.key}.jpg`,
+        loading: "lazy",
+        alt: shot.caption || app.name,
+      });
+      image.addEventListener(
+        "error",
+        () => {
+          figure.remove();
+          if (!gallery.childElementCount) gallery.remove();
+        },
+        { once: true },
+      );
+      figure.append(image, el("figcaption", {}, shot.caption));
+      gallery.append(figure);
+    }
+    node.append(gallery);
+  }
+  if (details.platforms)
+    node.append(el("p", { class: "platforms" }, `${t("Platforms")}: ${details.platforms}`));
+  const links = el("div", { class: "detail-actions" });
+  links.append(
+    openButton(app),
+    ...appLinks(app),
+    ...appLinks(app, false).filter((link) => link.href === repositoryURL(app)),
+  );
+  node.append(links);
+  document.getElementById("details-view").replaceChildren(node);
+}
+function route() {
+  let id;
+  try {
+    id = location.hash.startsWith("#app/") ? decodeURIComponent(location.hash.slice(5)) : null;
+  } catch {
+    id = null;
+  }
+  const app = apps.find((item) => item.id === id && item.catalogue?.details);
+  const entering = !!app && !showingDetails;
+  const leaving = !app && showingDetails;
+  if (entering) listScroll = window.scrollY;
+  document.getElementById("list-view").hidden = !!app;
+  document.getElementById("details-view").hidden = !app;
+  if (app) renderDetails(app);
+  showingDetails = !!app;
+  if (entering) {
+    document.querySelectorAll("details.menu[open]").forEach((menu) => {
+      menu.open = false;
+    });
+    window.scrollTo(0, 0);
+    const back = document.querySelector(".back-link");
+    back.focus({ preventScroll: true });
+  } else if (leaving) {
+    window.scrollTo(0, listScroll);
+    document.getElementById("search").focus({ preventScroll: true });
+  }
+}
+function notices() {
   const box = document.getElementById("notices");
   box.replaceChildren();
   const warn = (text) => box.append(el("p", { class: "notice" }, text));
-  if (!window.isSecureContext) {
-    warn("This page is not served over HTTPS. Some app features (WebGPU, clipboard, browser storage) only work over HTTPS or on localhost.");
-  }
-  const hb = status.updater && status.updater.heartbeat_at;
-  if (hb && Date.now() - Date.parse(hb) > HEARTBEAT_STALE_MS) {
+  if (!window.isSecureContext)
+    warn(
+      "This page is not served over HTTPS. Some app features (WebGPU, clipboard, browser storage) " +
+        "only work over HTTPS or on localhost.",
+    );
+  const hb = status.updater?.heartbeat_at;
+  if (hb && Date.now() - Date.parse(hb) > HEARTBEAT_STALE_MS)
     warn("The updater has not reported recently. Installed apps keep working; updates are paused.");
-  }
-  if (!status.apps.length) {
-    warn("The updater has not published the app list yet. Apps appear here once they are installed.");
-  }
+  if (!apps.length)
+    warn(
+      "The updater has not published the app list yet. Apps appear here once they are installed.",
+    );
 }
-
-// Who is signed in (when [auth] has a sign-in method); hidden for public, anonymous visits.
+function updateChecked() {
+  const newest = Math.max(0, ...apps.map((app) => Date.parse(app.last_check) || 0));
+  const ago = newest
+    ? plural("{n} min ago|{n} min ago", Math.max(0, Math.floor((Date.now() - newest) / 60000)))
+    : null;
+  document.getElementById("updated").textContent = ago
+    ? t("Checked {ago}", { ago })
+    : t("Not checked yet");
+}
+// Preserve the existing authentication and identity-linking behaviour.
 async function account() {
   let me;
   try {
@@ -100,8 +427,6 @@ async function account() {
     admin.href = me.admin_url;
     admin.hidden = false;
   }
-  // Signed in with a password and the provider is configured: offer to link it, so the next
-  // sign-in can use the provider.
   if (me.link_url) {
     const link = document.getElementById("account-link");
     link.textContent = `Link ${me.link_name}`;
@@ -117,28 +442,105 @@ async function account() {
   });
   document.getElementById("account").hidden = false;
 }
-
 async function load() {
-  const grid = document.getElementById("apps");
-  let status;
   try {
-    const res = await fetch("status.json", { cache: "no-cache" });
-    // Session ended while the page was open: reloading leads to the sign-in page.
-    if (res.status === 401) return location.reload();
-    status = await res.json();
+    const response = await fetch("status.json", { cache: "no-cache" });
+    if (response.status === 401) return location.reload();
+    if (!response.ok) throw new Error("Status unavailable");
+    const next = await response.json();
+    if (!Array.isArray(next.apps)) throw new Error("App list unavailable");
+    status = next;
   } catch {
-    grid.replaceChildren(el("p", { class: "placeholder" }, "Could not load the app list. Reload to try again."));
+    document
+      .getElementById("notices")
+      .replaceChildren(
+        el("p", { class: "notice" }, "Could not load the app list. Reload to try again."),
+      );
+    document.getElementById("apps").setAttribute("aria-busy", "false");
     return;
   }
-  notices(status);
-  grid.replaceChildren(...status.apps.map(card));
-  grid.setAttribute("aria-busy", "false");
-  const ready = status.apps.filter((a) => a.state === "ready").length;
-  document.getElementById("count").textContent = `${ready} of ${status.apps.length} ready`;
-  document.getElementById("summary").textContent = `Self-hosted · ${status.apps.length} apps`;
-  document.getElementById("updated").textContent = status.generated_at ? `Status updated ${new Date(status.generated_at).toLocaleString()}` : "";
-  if (status.apps.some((a) => a.state === "installing")) setTimeout(load, 10000);
+  const byId = new Map(catalogue.apps.map((app, order) => [app.id, { app, order }]));
+  let extraOrder = catalogue.apps.length;
+  apps = status.apps.map((app) => {
+    const entry = byId.get(app.id);
+    return {
+      ...entry?.app,
+      ...app,
+      name: String(app.name || app.id),
+      tagline: app.tagline ?? entry?.app.tagline ?? "",
+      catalogue: entry?.app,
+      order: entry?.order ?? extraOrder++,
+      displayGroup: entry && ["classic", "new"].includes(entry.app.group) ? entry.app.group : "",
+    };
+  });
+  notices();
+  renderFilters();
+  renderList();
+  route();
+  updateChecked();
 }
-
+function applyTheme() {
+  if (theme === "system") delete document.documentElement.dataset.theme;
+  else document.documentElement.dataset.theme = theme;
+  document.getElementById("theme").value = theme;
+}
+function applyView() {
+  document
+    .querySelectorAll("[data-view]")
+    .forEach((button) => button.setAttribute("aria-pressed", String(button.dataset.view === view)));
+}
+applyTheme();
+applyView();
+await Promise.all([
+  initLanguage(),
+  (async () => {
+    try {
+      const response = await fetch("launcher/catalog.json");
+      if (!response.ok) return;
+      const data = await response.json();
+      if (Array.isArray(data.apps) && Array.isArray(data.groups)) catalogue = data;
+    } catch {
+      /* Status remains usable when the optional catalogue is unavailable. */
+    }
+  })(),
+]);
+document.querySelectorAll("[data-i18n]").forEach((node) => {
+  node.textContent = t(node.dataset.i18n);
+});
+document.getElementById("search").placeholder = t("Search apps");
+document.querySelectorAll("[data-view]").forEach((button) =>
+  button.addEventListener("click", () => {
+    view = button.dataset.view;
+    persist("craft-launcher-view", view);
+    applyView();
+    renderList();
+  }),
+);
+document.getElementById("theme").addEventListener("change", (event) => {
+  theme = event.target.value;
+  persist("craft-launcher-theme", theme);
+  applyTheme();
+});
+document.getElementById("search").addEventListener("input", renderList);
+document.getElementById("sort").addEventListener("change", renderList);
+window.addEventListener("hashchange", route);
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (showingDetails) {
+    location.hash = "";
+    return;
+  }
+  const openMenu = document.querySelector("details.menu[open]");
+  if (openMenu) {
+    openMenu.open = false;
+    openMenu.querySelector("summary").focus();
+  }
+});
+document.addEventListener("click", (event) => {
+  document.querySelectorAll("details.menu[open]").forEach((node) => {
+    if (!node.contains(event.target)) node.open = false;
+  });
+});
 account();
-load();
+await load();
+setInterval(load, 60000);

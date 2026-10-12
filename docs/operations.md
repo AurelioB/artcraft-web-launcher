@@ -134,10 +134,29 @@ first above `cache_max_size`.
 
 ## Enabling, disabling and adding apps
 
-`enabled = false` in `[apps.<id>]` removes the app from the launcher, makes its URLs answer 404
-and stops its updates; releases and state stay on disk. Additional apps can be defined in
-`config.toml` with `name`, `repository` and `artifact_patterns` (see `config.example.toml`).
-Configuration changes take effect after `docker compose restart host`.
+Every built-in app is installed and kept up to date unless it is disabled. Disable or enable an
+app in `/admin` (takes effect at once, survives restarts and takes precedence over
+`config.toml`; see [admin](admin.md#administration-interface)), or set `enabled = false` in
+`[apps.<id>]`. A disabled app disappears from the launcher, its URLs answer 404 and its updates
+stop; releases and state stay on disk.
+
+A Craft app published after this version of `craft-host` follows the suite's conventions, so
+`config.toml` needs only its name:
+
+```toml
+[apps.examplecraft]
+name = "ExampleCraft"
+# repository = "storytold/examplecraft", artifact_patterns = ["examplecraft-web-{version}.zip"]
+```
+
+Other apps set `repository` and `artifact_patterns` as well (see `config.example.toml`). Its
+launcher logo is the release's own favicon when `index.html` names one. Configuration changes
+take effect after `docker compose restart host`.
+
+To make such an app built in, run `scripts/sync-craft-launcher.py --icons` (it refreshes the
+vendored ArtCraft Launcher catalogue, translations and logos from `storytold/craft-launcher`),
+add an `[apps.<id>]` section to `host/src/manifest.toml`, register the new logo in
+`host/src/assets.rs` and release a new image.
 
 ## Separate origins for apps
 

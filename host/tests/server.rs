@@ -1467,3 +1467,235 @@ fn local_and_oidc_sign_in_combine_and_link_explicitly() {
         401
     );
 }
+
+fn app_entry<'a>(status: &'a serde_json::Value, id: &str) -> Option<&'a serde_json::Value> {
+    // /status.json lists apps at the top; /admin/api/status nests the same report.
+    let apps = status.get("status").unwrap_or(status)["apps"].as_array()?;
+    apps.iter().find(|a| a["id"] == id)
+}
+
+#[test]
+fn admins_disable_and_enable_apps_and_the_choice_survives_restarts() {
+    let gh = FakeGitHub::start();
+    let e = installed_env(
+        &gh,
+        "[auth]\nmethods = [\"local\"]\n[admin]\nenabled = true\n",
+    );
+    write_users(
+        &e,
+        &[("ana", "s3cret-pw", "admin"), ("bo", "bo-password", "user")],
+    );
+    let s = start(&e);
+    let u = &s.url;
+    let action = |a: &str| format!("{u}/admin/api/apps/testcraft/{a}");
+
+    // Only administrators may switch apps, and only with the CSRF token.
+    let bo = session_from(&form_login(u, "bo", "bo-password", ""));
+    let forged = format!("{bo}; craft_csrf={}", "a".repeat(64));
+    let as_bo = [
+        ("Cookie", forged.as_str()),
+        ("X-Craft-CSRF", &"a".repeat(64)),
+    ];
+    assert_eq!(
+        request("POST", &action("disable"), &as_bo, None).status,
+        403
+    );
+    assert_eq!(request("POST", &action("disable"), &[], None).status, 401);
+    let ana = session_from(&form_login(u, "ana", "s3cret-pw", ""));
+    let (cookie, csrf) = admin_headers(u, &ana);
+    assert_eq!(
+        request("POST", &action("disable"), &[("Cookie", &cookie)], None).status,
+        403,
+        "no CSRF header"
+    );
+    assert_eq!(get(&format!("{u}/testcraft/"), &[]).status, 200);
+
+    let h = [("Cookie", cookie.as_str()), ("X-Craft-CSRF", csrf.as_str())];
+    assert_eq!(request("POST", &action("disable"), &h, None).status, 202);
+    let st = wait_idle(u, &h);
+    assert_eq!(st["results"][0]["ok"], true, "{st}");
+    let entry = app_entry(&st, "testcraft").unwrap();
+    assert_eq!(
+        (&entry["state"], &entry["enabled_by"]),
+        (&"disabled".into(), &"admin".into())
+    );
+    // No longer served, listed or updated; installed files stay.
+    assert_eq!(get(&format!("{u}/testcraft/"), &[]).status, 404);
+    assert_eq!(
+        get(&format!("{u}/testcraft/1.0.0/version.txt"), &[]).status,
+        404
+    );
+    assert_eq!(get(&format!("{u}/readyz/testcraft"), &[]).status, 404);
+    let public = json_body(&get(&format!("{u}/status.json"), &[]));
+    assert!(app_entry(&public, "testcraft").is_none());
+    assert!(e.release_dir("1.0.0").join("version.txt").is_file());
+    assert_eq!(request("POST", &action("update"), &h, None).status, 409);
+
+    // A restart keeps the choice; scheduled cycles skip the app.
+    gh.publish(
+        REPO,
+        "v1.1.0",
+        release_zip(&e.root(), "1.1.0", &[]),
+        PublishOpts::default(),
+    );
+    let restarted = craft_host::config::load_config(e.cfg.paths.clone()).unwrap();
+    assert!(!restarted.is_enabled(restarted.app("testcraft").unwrap()));
+    let cycle = craft_host::daemon::cycle(&restarted, &Updater::new(&restarted), true);
+    assert!(cycle.iter().all(|(id, _)| id != "testcraft"), "{cycle:?}");
+    assert!(!e.release_dir("1.1.0").exists());
+    let after_restart = spawn(router(
+        Shared::new(Arc::new(restarted), Arc::new(Activity::new())).unwrap(),
+    ));
+    assert_eq!(get(&format!("{after_restart}/testcraft/"), &[]).status, 404);
+    let public = json_body(&get(&format!("{after_restart}/status.json"), &[]));
+    assert!(app_entry(&public, "testcraft").is_none());
+
+    // Enabling brings it up to date at once and hands control back to config.toml.
+    assert_eq!(request("POST", &action("enable"), &h, None).status, 202);
+    let st = wait_idle(u, &h);
+    assert_eq!(st["results"][0]["ok"], true, "{st}");
+    assert!(
+        st["results"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("1.1.0"),
+        "{st}"
+    );
+    assert_eq!(
+        get(&format!("{u}/testcraft/version.txt"), &[]).text(),
+        "1.1.0"
+    );
+    let public = json_body(&get(&format!("{u}/status.json"), &[]));
+    assert_eq!(
+        app_entry(&public, "testcraft").unwrap()["enabled_by"],
+        "config"
+    );
+    let record = std::fs::read_to_string(e.cfg.paths.state.join("apps/testcraft.json")).unwrap();
+    assert!(!record.contains("\"enabled\""), "{record}");
+}
+
+#[test]
+fn launcher_data_release_icons_and_cached_screenshots() {
+    let gh = FakeGitHub::start();
+    let e = env_with(
+        &gh,
+        "",
+        "min_free_space = 0",
+        &format!("[launcher]\nscreenshots_url = \"{}/shots/\"\n", gh.url),
+    );
+    // A release whose entry page names a content-hashed favicon, as the Craft apps do.
+    let top = "testcraft-web-1.0.0";
+    let mut entries = craft_host::testutil::site_entries(top);
+    for (name, data) in &mut entries {
+        if name.ends_with("/index.html") {
+            *data = b"<html><head><link rel=\"icon\" href=\"./testcraft-1a2b.ico\"></head><script type=module>import init from './app.js'; init({module_or_path: './app_bg.wasm'});</script></html>".to_vec();
+        }
+    }
+    entries.push((format!("{top}/testcraft-1a2b.ico"), b"ico".to_vec()));
+    let zip = e.root().join("icon.zip");
+    let refs: Vec<(&str, &[u8])> = entries
+        .iter()
+        .map(|(n, d)| (n.as_str(), d.as_slice()))
+        .collect();
+    craft_host::testutil::deflated_zip(&zip, &refs);
+    gh.publish(
+        REPO,
+        "v1.0.0",
+        std::fs::read(&zip).unwrap(),
+        PublishOpts::default(),
+    );
+    let u = Updater::new(&e.cfg);
+    u.prepare().unwrap();
+    u.update_app(e.cfg.app("testcraft").unwrap(), true);
+    // PhotoCraft (disabled in the test setup) switched on, VectorCraft left off.
+    e.cfg.set_switch("photocraft", Some(true));
+    let s = start(&e);
+    let u = &s.url;
+
+    let st = json_body(&get(&format!("{u}/status.json"), &[]));
+    assert_eq!(st["launcher"]["screenshots"], true);
+    let app = app_entry(&st, "testcraft").unwrap();
+    assert_eq!(app["icon"], "testcraft/1.0.0/testcraft-1a2b.ico");
+    assert_eq!(
+        get(&format!("{u}/{}", app["icon"].as_str().unwrap()), &[]).status,
+        200
+    );
+    assert_eq!(
+        (
+            &app["release_tag"],
+            &app["released"],
+            &app["repository"],
+            &app["group"]
+        ),
+        (
+            &"v1.0.0".into(),
+            &"2026-10-08T00:00:00Z".into(),
+            &"storytold/testcraft".into(),
+            &"".into()
+        )
+    );
+    let photo = app_entry(&st, "photocraft").unwrap();
+    assert_eq!(
+        (&photo["icon"], &photo["group"], &photo["website"]),
+        (
+            &"launcher/icons/photocraft.webp".into(),
+            &"classic".into(),
+            &"https://getartcraft.com/apps/photocraft".into()
+        )
+    );
+    assert_eq!(
+        json_body(&get(&format!("{u}/launcher/catalog.json"), &[]))["apps"]
+            .as_array()
+            .unwrap()
+            .len(),
+        12
+    );
+    let de = get(&format!("{u}/launcher/i18n/de.tsv"), &[]);
+    assert!(
+        de.text()
+            .contains("photocraft\tImage editing\tBildbearbeitung")
+    );
+
+    // Catalogued pictures are fetched once and then served from the cache.
+    let jpeg = [&[0xFF, 0xD8, 0xFF, 0xE0][..], b"picture"].concat();
+    gh.put_route("/shots/photocraft/demo.jpg", jpeg.clone());
+    gh.put_route(
+        "/shots/photocraft/adjustments.jpg",
+        b"<html>login</html>".to_vec(),
+    );
+    for _ in 0..2 {
+        let r = get(&format!("{u}/launcher/shots/photocraft/demo.jpg"), &[]);
+        assert_eq!(
+            (r.status, r.header("content-type")),
+            (200, Some("image/jpeg"))
+        );
+        assert_eq!(r.body, jpeg);
+    }
+    assert_eq!(gh.hits("/shots/photocraft/demo.jpg"), 1);
+    // Anything that is not a JPEG is refused, and not asked for again at once.
+    for _ in 0..2 {
+        let r = get(
+            &format!("{u}/launcher/shots/photocraft/adjustments.jpg"),
+            &[],
+        );
+        assert_eq!(r.status, 404);
+    }
+    assert_eq!(gh.hits("/shots/photocraft/adjustments.jpg"), 1);
+    // Names outside the catalogue and disabled apps never reach the network.
+    for path in [
+        "photocraft/nope.jpg",
+        "photocraft/demo.png",
+        "vectorcraft/neon.jpg",
+        "..%2Fphotocraft/demo.jpg",
+    ] {
+        assert_eq!(
+            get(&format!("{u}/launcher/shots/{path}"), &[]).status,
+            404,
+            "{path}"
+        );
+    }
+    assert_eq!(
+        gh.hits("/shots/photocraft/nope.jpg") + gh.hits("/shots/vectorcraft/neon.jpg"),
+        0
+    );
+}

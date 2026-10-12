@@ -24,6 +24,13 @@ pub struct InstalledRelease {
     pub installed_at: String,
     #[serde(default)]
     pub size: u64,
+    /// When GitHub published the release.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub published_at: Option<String>,
+    /// The release's own favicon (from `<link rel="icon">` in its index.html), relative to the
+    /// release directory.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -51,6 +58,10 @@ pub struct AppState {
     pub pending: Option<String>,
     /// Pin set with the CLI; takes precedence over `pinned_version` in config.toml.
     pub pinned: Option<String>,
+    /// Enabled or disabled in /admin; takes precedence over `enabled` in config.toml. Absent
+    /// while it agrees with config.toml.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub enabled: Option<bool>,
     /// Versions an operator rolled back from; not reinstalled automatically until allowed.
     pub blocked: Vec<String>,
     pub latest_seen: Option<SeenRelease>,

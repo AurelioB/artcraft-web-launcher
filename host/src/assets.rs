@@ -1,5 +1,6 @@
-//! Launcher assets compiled into the binary: pages, script, styles, the official app logos and
-//! the fonts used by https://getartcraft.com (Archivo and Geist Mono, SIL Open Font License).
+//! Launcher assets compiled into the binary: pages, script, styles, the official app logos, the
+//! fonts used by https://getartcraft.com (Archivo and Geist Mono, SIL Open Font License) and the
+//! catalogue and translations vendored from ArtCraft Launcher (MIT OR Apache-2.0).
 
 pub struct Asset {
     pub bytes: &'static [u8],
@@ -15,11 +16,31 @@ macro_rules! asset {
     };
 }
 
+macro_rules! translation {
+    ($code:literal) => {
+        (
+            concat!("i18n/", $code, ".tsv"),
+            Asset {
+                bytes: include_bytes!(concat!(
+                    "../assets/vendor/craft-launcher/i18n/",
+                    $code,
+                    ".tsv"
+                )),
+                content_type: "text/tab-separated-values; charset=utf-8",
+            },
+        )
+    };
+}
+
 /// `(path under /launcher/, asset)`.
 const LAUNCHER: &[(&str, Asset)] = &[
     (
         "launcher.js",
         asset!("launcher.js", "text/javascript; charset=utf-8"),
+    ),
+    (
+        "launcher-i18n.js",
+        asset!("launcher-i18n.js", "text/javascript; charset=utf-8"),
     ),
     (
         "launcher.css",
@@ -61,6 +82,47 @@ const LAUNCHER: &[(&str, Asset)] = &[
         "icons/designcraft.webp",
         asset!("icons/designcraft.webp", "image/webp"),
     ),
+    (
+        "icons/wordcraft.webp",
+        asset!("icons/wordcraft.webp", "image/webp"),
+    ),
+    (
+        "icons/deckcraft.webp",
+        asset!("icons/deckcraft.webp", "image/webp"),
+    ),
+    (
+        "icons/gridcraft.webp",
+        asset!("icons/gridcraft.webp", "image/webp"),
+    ),
+    (
+        "icons/cadcraft.webp",
+        asset!("icons/cadcraft.webp", "image/webp"),
+    ),
+    (
+        "icons/soundcraft.webp",
+        asset!("icons/soundcraft.webp", "image/webp"),
+    ),
+    (
+        "catalog.json",
+        asset!("vendor/craft-launcher/catalog.json", "application/json"),
+    ),
+    (
+        "i18n/languages.json",
+        asset!(
+            "vendor/craft-launcher/i18n/languages.json",
+            "application/json"
+        ),
+    ),
+    translation!("cs"),
+    translation!("de"),
+    translation!("es"),
+    translation!("fr"),
+    translation!("hu"),
+    translation!("ja"),
+    translation!("pl"),
+    translation!("pt-BR"),
+    translation!("ru"),
+    translation!("zh-CN"),
     (
         "fonts/archivo-latin.woff2",
         asset!("fonts/archivo-latin.woff2", "font/woff2"),

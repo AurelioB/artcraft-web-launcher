@@ -1,0 +1,726 @@
+{
+  "source": {
+    "repository": "storytold/craft-launcher",
+    "commit": "1aaf7b27be2dba970d1a77f96aef6aad52352730",
+    "screenshots_base": "https://raw.githubusercontent.com/storytold/craft-launcher-assets",
+    "screenshots_rev": "v1"
+  },
+  "groups": [
+    {
+      "id": "classic",
+      "label": "Classic apps"
+    },
+    {
+      "id": "new",
+      "label": "New apps"
+    }
+  ],
+  "apps": [
+    {
+      "id": "photocraft",
+      "name": "PhotoCraft",
+      "tagline": "Image editing",
+      "group": "classic",
+      "color": "#2f7bf5",
+      "ink_light": "#1a5bc4",
+      "ink_dark": "#7fb0ff",
+      "repository": "storytold/photocraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/photocraft",
+      "details": {
+        "headline": "The image editor you already know how to use.",
+        "about": [
+          "Layers, masks, adjustment layers, layer styles, type, vectors and brushes in a native app written in Rust. Open source, offline, and yours.",
+          "PhotoCraft keeps the menus, shortcuts and panels your hands already know, so there is nothing to relearn."
+        ],
+        "features": [
+          {
+            "title": "Native GPU canvas",
+            "text": "No Electron and no web view: a fast native compositor."
+          },
+          {
+            "title": "Real layered files",
+            "text": "Opens and saves layered PSD and PSB documents."
+          },
+          {
+            "title": "Non-destructive editing",
+            "text": "Adjustment layers, live-preview filters, smart objects and layer styles."
+          },
+          {
+            "title": "On-device selection",
+            "text": "Subject and object selection and mask refinement run locally."
+          },
+          {
+            "title": "Serious color",
+            "text": "8-, 16- and 32-bit RGB, CMYK, Lab and Grayscale, with ICC color management and soft proofing."
+          }
+        ],
+        "shots": [
+          {
+            "key": "demo",
+            "caption": "Curves and type layers"
+          },
+          {
+            "key": "adjustments",
+            "caption": "Levels with a live histogram"
+          },
+          {
+            "key": "layer-styles",
+            "caption": "Layer styles on live type"
+          },
+          {
+            "key": "masks",
+            "caption": "Selections and masked adjustments"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "vectorcraft",
+      "name": "VectorCraft",
+      "tagline": "Vector illustration",
+      "group": "classic",
+      "color": "#e8573f",
+      "ink_light": "#b83a24",
+      "ink_dark": "#ff8a70",
+      "repository": "storytold/vectorcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/vectorcraft",
+      "details": {
+        "headline": "Vector illustration, reimagined in pure Rust.",
+        "about": [
+          "A native vector illustration app with the pen, panels and shortcuts illustrators expect. Open source, and it also runs in a browser."
+        ],
+        "features": [
+          {
+            "title": "The workflow you know",
+            "text": "Pen, direct selection, shape booleans, snapping guides and an appearance panel, laid out the way you expect."
+          },
+          {
+            "title": "Genuinely fast",
+            "text": "Drawings with thousands of shapes stay responsive on a retina display."
+          },
+          {
+            "title": "Booleans that don't fail",
+            "text": "Shape booleans work on the exact curves, so there is no \"cannot perform operation\", and undo is unlimited."
+          },
+          {
+            "title": "Live, editable effects",
+            "text": "Blends, envelope distort, gradient mesh, repeats, glows and drop shadows all stay editable."
+          },
+          {
+            "title": "Image tracing",
+            "text": "Turn raster images into clean vector paths, with presets for the common cases."
+          },
+          {
+            "title": "Open formats",
+            "text": "Native JSON documents, SVG and PDF import and export, and PNG, JPEG and WebP output."
+          }
+        ],
+        "shots": [
+          {
+            "key": "neon",
+            "caption": "The Neon Drive poster"
+          },
+          {
+            "key": "ribbons",
+            "caption": "Live blends"
+          },
+          {
+            "key": "sheet",
+            "caption": "A feature sheet and the Layers panel"
+          },
+          {
+            "key": "bezier",
+            "caption": "Pathfinder and exact booleans"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "filmcraft",
+      "name": "FilmCraft",
+      "tagline": "Video editing, color and sound",
+      "group": "classic",
+      "color": "#8b5cf6",
+      "ink_light": "#6a3fd6",
+      "ink_dark": "#b69cff",
+      "repository": "storytold/filmcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/filmcraft",
+      "details": {
+        "headline": "Professional video editing, rebuilt from scratch.",
+        "about": [
+          "A native video editor written in pure Rust, with source and program monitors, a real timeline and every trim mode."
+        ],
+        "features": [
+          {
+            "title": "A timeline you already know",
+            "text": "Source and program monitors, three-point editing, every trim mode and J/K/L trimming."
+          },
+          {
+            "title": "Frame-exact time",
+            "text": "An integer timebase keeps 23.976 and 29.97 drop-frame footage exact, with no drift."
+          },
+          {
+            "title": "Its own codecs",
+            "text": "No FFmpeg inside: native support for H.264, HEVC, ProRes, VP9, AAC and Opus."
+          },
+          {
+            "title": "Color grading",
+            "text": "Curves, color wheels, HSL secondaries, LUTs and HDR and log workflows, with scopes to check the result."
+          },
+          {
+            "title": "Effects and keyframes",
+            "text": "Video effects and transitions, keyframes with value and velocity graphs, and a linear-light GPU compositor."
+          },
+          {
+            "title": "Broadcast-ready audio",
+            "text": "EBU R128 loudness meters, a mixer with automation and native audio effects."
+          }
+        ],
+        "shots": [
+          {
+            "key": "color",
+            "caption": "The Color workspace, with scopes"
+          },
+          {
+            "key": "assembly",
+            "caption": "The Assembly workspace"
+          },
+          {
+            "key": "keyframes",
+            "caption": "Keyframes in Effect Controls"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "lightcraft",
+      "name": "LightCraft",
+      "tagline": "Photo library and raw development",
+      "group": "classic",
+      "color": "#f2a516",
+      "ink_light": "#8a5800",
+      "ink_dark": "#ffc14d",
+      "repository": "storytold/lightcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/lightcraft",
+      "details": {
+        "headline": "Your photos. Your pixels. Your machine.",
+        "about": [
+          "A fast photo library and non-destructive raw developer, written from scratch in pure Rust. No account, no cloud, no telemetry and no subscription."
+        ],
+        "features": [
+          {
+            "title": "Non-destructive by design",
+            "text": "A wide-gamut, 32-bit float pipeline that never touches your originals."
+          },
+          {
+            "title": "Every control you reach for",
+            "text": "Light, color, effects, tone curve, a color mixer, color grading wheels and built-in presets."
+          },
+          {
+            "title": "Precise masking",
+            "text": "Brush, gradient and range masks, plus sky, subject and background masks."
+          },
+          {
+            "title": "Native raw decoding",
+            "text": "Pure-Rust decoders for the main camera raw formats: DNG, CR2, ARW, NEF, RAF, RW2, PEF and ORF."
+          },
+          {
+            "title": "A library that keeps up",
+            "text": "Albums, ratings, flags and search, with grids that stay smooth on large catalogs."
+          },
+          {
+            "title": "Instant feedback",
+            "text": "The GPU pipeline updates the preview as you move a slider, even on large raw files."
+          }
+        ],
+        "shots": [
+          {
+            "key": "hero",
+            "caption": "The Edit view"
+          },
+          {
+            "key": "curve",
+            "caption": "The tone curve"
+          },
+          {
+            "key": "grading",
+            "caption": "Color grading wheels"
+          },
+          {
+            "key": "masking",
+            "caption": "A radial mask over a sky mask"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "pdfcraft",
+      "name": "PdfCraft",
+      "tagline": "Reading, organizing and protecting PDFs",
+      "group": "classic",
+      "color": "#12a58a",
+      "ink_light": "#0a7563",
+      "ink_dark": "#3fd6b8",
+      "repository": "storytold/pdfcraft",
+      "former_ids": [
+        "printcraft"
+      ],
+      "website": "https://getartcraft.com/apps/pdfcraft",
+      "details": {
+        "headline": "The open-source PDF workbench.",
+        "about": [
+          "Read, organize, combine, split and secure PDFs in a fast, native app written in Rust from the ground up. No account, no telemetry and no cloud."
+        ],
+        "features": [
+          {
+            "title": "Faithful rendering",
+            "text": "World scripts, vertical Japanese, color emoji and transparency."
+          },
+          {
+            "title": "Search as you type",
+            "text": "Instant find, and text selection that follows the document's real reading order."
+          },
+          {
+            "title": "Organize like cards",
+            "text": "Rotate, delete, insert and reorder pages, with deep undo behind every change."
+          },
+          {
+            "title": "Combine, extract, split",
+            "text": "Assemble and break apart documents while keeping links, form fields, layers and bookmarks intact."
+          },
+          {
+            "title": "Fearless saves",
+            "text": "Incremental, atomic saves with autosave and crash recovery."
+          },
+          {
+            "title": "Built-in security",
+            "text": "Opens files from RC4 to AES-256 encryption and honors the author's permissions."
+          }
+        ],
+        "shots": [],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "effectcraft",
+      "name": "EffectCraft",
+      "tagline": "Motion graphics and visual effects",
+      "group": "classic",
+      "color": "#e0368f",
+      "ink_light": "#b0206c",
+      "ink_dark": "#ff7ab8",
+      "repository": "storytold/effectcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/effectcraft",
+      "details": {
+        "headline": "Motion graphics and visual effects, in pure Rust.",
+        "about": [
+          "A native compositor with compositions, layers, keyframes, effects, expressions, 3D cameras and lights, and a render queue. Young, moving fast, and already usable."
+        ],
+        "features": [
+          {
+            "title": "Animate the way you know",
+            "text": "Familiar panels and keyframes (linear, bezier, hold and eased), with a graph editor for value and speed curves."
+          },
+          {
+            "title": "Layers of every kind",
+            "text": "Solids, shapes, text, footage, nested compositions, nulls and adjustment layers, with parenting, track mattes and blend modes."
+          },
+          {
+            "title": "A large effects library",
+            "text": "Blur, color correction, distortion, generators, keying, particles and simulation, stylize and time effects."
+          },
+          {
+            "title": "Real 3D",
+            "text": "3D layers with cameras, depth of field, and lights that cast soft ray-traced shadows."
+          },
+          {
+            "title": "Expressions",
+            "text": "JavaScript expressions with wiggle, loops and layer references, edited inline."
+          },
+          {
+            "title": "Export anywhere",
+            "text": "H.264 and ProRes with alpha, PNG, TIFF and EXR sequences, GIF, and Lottie import and export."
+          }
+        ],
+        "shots": [
+          {
+            "key": "hero",
+            "caption": "An animated composition"
+          },
+          {
+            "key": "graph",
+            "caption": "The Graph Editor"
+          },
+          {
+            "key": "effects",
+            "caption": "Particles and Effect Controls"
+          },
+          {
+            "key": "3d",
+            "caption": "3D layers with cameras and lights"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "designcraft",
+      "name": "DesignCraft",
+      "tagline": "Page layout and publishing",
+      "group": "classic",
+      "color": "#7bb51c",
+      "ink_light": "#457008",
+      "ink_dark": "#a6e04a",
+      "repository": "storytold/designcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/designcraft",
+      "details": {
+        "headline": "Page layout and publishing, rebuilt in pure Rust.",
+        "about": [
+          "A native layout app with spreads, parent pages, threaded stories, styles, swatches, text wrap and a paragraph composer. No subscription, no license server and no telemetry."
+        ],
+        "features": [
+          {
+            "title": "The layout tools you know",
+            "text": "Spreads and parent pages, frames and threaded stories, with paragraph and character styles."
+          },
+          {
+            "title": "Beautiful type",
+            "text": "A Knuth–Plass paragraph composer, dictionary hyphenation, optical margin alignment and baseline grids, with line breaks that match on screen and in PDF."
+          },
+          {
+            "title": "Print-ready PDF",
+            "text": "Real selectable text with embedded fonts, CMYK and spot colors, bleed, crop marks and PDF/A output."
+          },
+          {
+            "title": "Fast",
+            "text": "Multithreaded rendering, instant undo and cached text composition."
+          },
+          {
+            "title": "Open formats",
+            "text": "A documented native format, PNG export and layout interchange import and export."
+          },
+          {
+            "title": "Built for automation",
+            "text": "Every menu item, tool, panel and dialog can be driven over a JSON control channel and an MCP server."
+          }
+        ],
+        "shots": [
+          {
+            "key": "spread",
+            "caption": "A magazine spread with a threaded story"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "wordcraft",
+      "name": "WordCraft",
+      "tagline": "Writing and document design",
+      "group": "new",
+      "color": "#3f5fe0",
+      "ink_light": "#2a44b8",
+      "ink_dark": "#8ea2ff",
+      "repository": "storytold/wordcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/wordcraft",
+      "details": {
+        "headline": "The familiar word processor, native and offline.",
+        "about": [
+          "A word processor with the ribbon, shortcuts and behavior you already know, written in Rust. Open source, and built from public specifications."
+        ],
+        "features": [
+          {
+            "title": "Familiar",
+            "text": "Ribbon tabs and groups, a live Styles gallery and the editing behavior you expect, from list continuation to Format Painter."
+          },
+          {
+            "title": "Your files",
+            "text": "Opens and saves .docx, and also .odt, .rtf, .html, .md, .tex and .txt. Opens older .doc files and exports PDF with real, selectable text."
+          },
+          {
+            "title": "Fast",
+            "text": "Paragraph layout is cached, so typing stays responsive even in long documents."
+          },
+          {
+            "title": "Private",
+            "text": "Spelling, grammar and everything else work offline."
+          },
+          {
+            "title": "Everywhere",
+            "text": "One Rust codebase for macOS, Windows, Linux, BSD and the web."
+          },
+          {
+            "title": "Built for agents",
+            "text": "Every action is a command, driven from the ribbon, shortcuts, a command-line tool, a JSON control channel or an MCP server."
+          }
+        ],
+        "shots": [
+          {
+            "key": "hero",
+            "caption": "The Home tab and the Navigation pane"
+          },
+          {
+            "key": "review",
+            "caption": "Track Changes and comments"
+          },
+          {
+            "key": "design",
+            "caption": "The Design tab"
+          },
+          {
+            "key": "layout",
+            "caption": "The Layout tab"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "deckcraft",
+      "name": "DeckCraft",
+      "tagline": "Presentations and slide shows",
+      "group": "new",
+      "color": "#f07a1e",
+      "ink_light": "#a84f0a",
+      "ink_dark": "#ffa060",
+      "repository": "storytold/deckcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/deckcraft",
+      "details": {
+        "headline": "Presentations, rebuilt in Rust.",
+        "about": [
+          "A presentation app with slide masters, shapes, animations and a presenter view, written in Rust. In alpha, heading for beta."
+        ],
+        "features": [
+          {
+            "title": "Make decks",
+            "text": "Slide masters and layouts with placeholders that inherit formatting, themes, sections, notes and comments."
+          },
+          {
+            "title": "Draw",
+            "text": "Preset shapes with adjust handles, connectors that stay glued to shapes, freeform tools, merged shapes, gradients, shadows and glow."
+          },
+          {
+            "title": "Write",
+            "text": "In-place text editing with full font and paragraph formatting, bullets and numbering, columns and autofit."
+          },
+          {
+            "title": "Add content",
+            "text": "Pictures with crop and corrections, styled tables, charts, audio and video."
+          },
+          {
+            "title": "Present",
+            "text": "Transitions including Morph, animations and motion paths, a full-screen slide show, presenter view and rehearsed timings."
+          },
+          {
+            "title": "Exchange files",
+            "text": "Opens and saves PowerPoint .pptx and exports PDF (slides, notes pages and handouts), PNG and JPEG."
+          }
+        ],
+        "shots": [
+          {
+            "key": "editor",
+            "caption": "Editing a slide, with sections and notes"
+          },
+          {
+            "key": "shape",
+            "caption": "The Shape Format tab"
+          },
+          {
+            "key": "sorter",
+            "caption": "The slide sorter"
+          },
+          {
+            "key": "format",
+            "caption": "The Format Shape pane"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "gridcraft",
+      "name": "GridCraft",
+      "tagline": "Spreadsheets and data",
+      "group": "new",
+      "color": "#1f9d55",
+      "ink_light": "#12703a",
+      "ink_dark": "#4fd68a",
+      "repository": "storytold/gridcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/gridcraft",
+      "details": {
+        "headline": "Spreadsheets you already know how to use.",
+        "about": [
+          "A spreadsheet with the ribbon, formula bar, sheet tabs and shortcuts you know, on a calculation engine written in Rust. No subscription, no license server and no telemetry."
+        ],
+        "features": [
+          {
+            "title": "Familiar",
+            "text": "The ribbon, formula bar, Name Box, fill handle, point-mode formulas, Format Cells, Paste Special, conditional formatting, tables and charts."
+          },
+          {
+            "title": "Compatible",
+            "text": "XLSX is the native format, with formulas, tables, conditional formats, charts, pivot tables and print settings round-tripping. CSV and TSV too."
+          },
+          {
+            "title": "Capable",
+            "text": "A dependency-graph calculation engine with dynamic arrays, LET and LAMBDA, structured table references, sort, AutoFilter and Flash Fill."
+          },
+          {
+            "title": "Fast",
+            "text": "Copy-on-write workbooks, incremental recalculation and a grid that only lays out what is on screen."
+          },
+          {
+            "title": "Agent-native",
+            "text": "Every ribbon button, menu item, dialog and keystroke is a command, available over a JSON control channel, an MCP server or the CLI."
+          },
+          {
+            "title": "Everywhere",
+            "text": "One Rust codebase for the desktop and the web."
+          }
+        ],
+        "shots": [
+          {
+            "key": "hero",
+            "caption": "A quarterly sales dashboard"
+          },
+          {
+            "key": "budget",
+            "caption": "A household budget"
+          },
+          {
+            "key": "pivot",
+            "caption": "A pivot table"
+          },
+          {
+            "key": "chart",
+            "caption": "Formatting a chart"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "cadcraft",
+      "name": "CADCraft",
+      "tagline": "Computer-aided design and drafting",
+      "group": "new",
+      "color": "#3ea6e8",
+      "ink_light": "#1a6fa8",
+      "ink_dark": "#7cc8ff",
+      "repository": "storytold/cadcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/cadcraft",
+      "details": {
+        "headline": "Computer-aided drafting, in pure Rust.",
+        "about": [
+          "A drafting app with the command line, object snaps and workflow that drafters already know. Free, with no account and no subscription. In early, fast development."
+        ],
+        "features": [
+          {
+            "title": "The workflow you know",
+            "text": "Type L, click two points, type @5<45 and press Enter. Prompts with clickable keywords, polar tracking, direct distance entry and grips work the way drafting habit expects."
+          },
+          {
+            "title": "Open files",
+            "text": "Reads and writes DXF natively (R12 through 2018) and opens and saves DWG (R13 through 2018) with the open-source acadrust library. Exports SVG and PNG."
+          },
+          {
+            "title": "Fast and native",
+            "text": "Pure Rust and egui, with no Electron and no web view."
+          },
+          {
+            "title": "A full drafting toolset",
+            "text": "Draw, modify, dimension, hatch and block commands, layers with a properties manager, paper-space layouts and PDF plotting."
+          },
+          {
+            "title": "Built for agents",
+            "text": "Every menu item, tool and prompt is a command, available over MCP, a JSON control channel or the CLI."
+          }
+        ],
+        "shots": [
+          {
+            "key": "apartment",
+            "caption": "An apartment floor plan"
+          },
+          {
+            "key": "bracket",
+            "caption": "A mechanical bracket drawing"
+          },
+          {
+            "key": "layout",
+            "caption": "A layout sheet"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "soundcraft",
+      "name": "SoundCraft",
+      "tagline": "Recording, editing and mixing audio",
+      "group": "new",
+      "color": "#1fa5c9",
+      "ink_light": "#0e7290",
+      "ink_dark": "#5fd0ee",
+      "repository": "storytold/soundcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/soundcraft",
+      "details": {
+        "headline": "Recording, editing and mixing, in Rust.",
+        "about": [
+          "A digital audio workstation that follows the workflow audio engineers already know: an Edit window for arranging and editing, and a Mix window for balancing. Pre-alpha."
+        ],
+        "features": [
+          {
+            "title": "Editing",
+            "text": "Shuffle, Slip, Spot and Grid modes, Smart, Grabber, Trim and other tools, fades and crossfades, playlists with comping lanes and clip gain."
+          },
+          {
+            "title": "Mixing",
+            "text": "Faders and pans with automation, sends, busses, aux inputs, VCA masters, routing folders and automatic plugin delay compensation."
+          },
+          {
+            "title": "Automation",
+            "text": "Volume, pan, mute, send and every plugin parameter, with Write, Touch, Latch and Trim passes recorded live from the faders."
+          },
+          {
+            "title": "Plugins",
+            "text": "EQ, dynamics, reverbs, modulation effects, a subtractive synth and a drum synth, all original, and CLAP plugins load too."
+          }
+        ],
+        "shots": [
+          {
+            "key": "edit",
+            "caption": "The Edit window with a nine-track session"
+          },
+          {
+            "key": "mix",
+            "caption": "The Mix window"
+          },
+          {
+            "key": "automation",
+            "caption": "Automation and memory locations"
+          },
+          {
+            "key": "score",
+            "caption": "The Score Editor"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    }
+  ]
+}

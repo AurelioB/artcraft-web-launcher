@@ -412,7 +412,7 @@ pub struct ActionBody {
 }
 
 const ACTIONS: &[&str] = &[
-    "check", "update", "apply", "pin", "unpin", "rollback", "allow",
+    "check", "update", "apply", "pin", "unpin", "rollback", "allow", "enable", "disable",
 ];
 
 pub async fn api_action(
@@ -436,8 +436,8 @@ pub async fn api_action(
     let Ok(app) = s.cfg.app(&app_id) else {
         return json_error(StatusCode::NOT_FOUND, "unknown app");
     };
-    if !app.enabled {
-        return json_error(StatusCode::CONFLICT, "app is disabled in config.toml");
+    if !s.cfg.is_enabled(app) && action != "enable" {
+        return json_error(StatusCode::CONFLICT, "app is disabled; enable it first");
     }
     let version = body
         .and_then(|b| b.0.version)
@@ -548,6 +548,8 @@ fn run_action(
         "unpin" => text(updater.unpin(app)),
         "rollback" => text(updater.rollback(app, version)),
         "allow" => text(updater.allow(app, version.unwrap_or_default())),
+        "enable" => text(updater.set_enabled(app, true)),
+        "disable" => text(updater.set_enabled(app, false)),
         _ => (false, "unknown action".into()),
     }
 }

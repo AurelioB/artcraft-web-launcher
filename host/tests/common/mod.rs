@@ -13,7 +13,7 @@ use parking_lot::Mutex;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
-use craft_host::config::{Config, Paths, load_config};
+use craft_host::config::{Config, MANIFEST, Paths, load_config};
 
 #[derive(Clone, Default)]
 pub struct Behavior {
@@ -302,15 +302,8 @@ artifact_patterns = ["testcraft-web-{{version}}.zip", "oldcraft-web-{{version}}.
 "#,
         gh.url
     );
-    for id in [
-        "photocraft",
-        "vectorcraft",
-        "filmcraft",
-        "lightcraft",
-        "pdfcraft",
-        "effectcraft",
-        "designcraft",
-    ] {
+    let manifest: toml::Table = toml::from_str(MANIFEST).unwrap();
+    for id in manifest["apps"].as_table().unwrap().keys() {
         toml.push_str(&format!("[apps.{id}]\nenabled = false\n"));
     }
     toml.push_str(sections);

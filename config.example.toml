@@ -1,6 +1,6 @@
 # Craft Apps Host configuration. Copy to CONFIG_DIR/config.toml.
-# Global settings and built-in app overrides are optional; new apps need name, repository and
-# artifact_patterns. Values shown below are defaults. Unknown keys are rejected.
+# Global settings and built-in app overrides are optional; new apps need at least a name.
+# Values shown below are defaults. Unknown keys are rejected.
 # Sizes accept bytes or units ("512MiB", "2GiB"); durations accept seconds or "30s"/"15m"/"1h"/"1d".
 
 [server]
@@ -100,8 +100,15 @@ enabled = false
 # an app could act with a signed-in administrator's session. See docs/admin.md.
 host = ""
 
+[launcher]
+# Screenshots on the launcher's app pages: fetched once by the server from this URL
+# (<url>/<app>/<key>.jpg, catalogued pictures only) and cached in CACHE_DIR. "" turns them off.
+screenshots_url = "https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1"
+
 # Per-app settings. Built-in apps: photocraft, vectorcraft, filmcraft, lightcraft, pdfcraft,
-# effectcraft, designcraft. Built-in apps accept only the keys shown here.
+# effectcraft, designcraft, wordcraft, deckcraft, gridcraft, cadcraft, soundcraft. All are
+# installed unless disabled here or in /admin (the /admin choice takes precedence). Built-in
+# apps accept only the keys shown here.
 #
 # [apps.photocraft]
 # enabled = true
@@ -117,8 +124,9 @@ host = ""
 # origin = ""                   # e.g. "https://lightcraft.example.net": link the app on its own
 #                               # host name so it gets separate browser storage
 #
-# Additional apps also define name, repository, artifact_patterns and optionally
-# checksum_assets, exclude, icon (path inside the release), notes, and launcher metadata
+# Additional apps define a name and may set repository (default "storytold/<id>"),
+# artifact_patterns (default ["<id>-web-{version}.zip"]), checksum_assets, exclude, icon (path
+# inside the release; default: the release's own favicon), notes, and launcher metadata
 # category, tagline and color ("#rrggbb"):
 #
 # [apps.examplecraft]

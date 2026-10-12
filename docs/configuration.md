@@ -103,29 +103,31 @@ Used with `methods = ["proxy"]`. Header names must be nonempty and contain only 
 | `enabled` | bool; `false` | Serve the administration interface at `/admin/` on the apps' listener. With no sign-in configured, anyone who can reach it is an administrator. |
 | `host` | string; `""` (unset) | Restrict `/admin` to this host name (optional `:port`); apps are not served on that host. Whitespace is trimmed and the host is lowercased. Nonempty values require nonempty dot-separated ASCII alphanumeric/`-` labels and, if specified, a nonzero numeric port fitting `u16`. No URL scheme/path or IPv6 literal. Incompatible with OIDC sign-in. Without a separate host, admin and apps share a browser origin. |
 
+## `[launcher]`
+
+| Key | Type; default | Meaning and validation |
+| --- | --- | --- |
+| `screenshots_url` | string; the pinned tag of `storytold/craft-launcher-assets` (`https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1`) | Where the server fetches the screenshots shown on the launcher's app pages: `<url>/<app>/<key>.jpg`, only for pictures named in the vendored catalogue and only for enabled apps. Each picture is fetched once (JPEG only, at most 2 MiB, `[updater] http_timeout`) and kept in `CACHE_DIR/shots`; browsers never contact the source. A failed picture is not requested again for 10 minutes. Must be an `http(s)` URL; `""` turns screenshots off. |
+
 ## Apps and the built-in manifest
 
-The [built-in manifest](../host/src/manifest.toml) is compiled into `craft-host`; do not edit it to customize a deployed server. By default all seven apps are enabled, auto-updated on the stable channel, use `SHA256SUMS.txt` as a checksum-asset name, and serve under `/<entry>/` (stable URL) while versioned resources live at `/<entry>/<version>/`. An app's default `entry` is its ID; its default `release_dir` is `releases/<id>` under `DATA_DIR`. Each of these manifest apps has its own repository and ZIP artifact pattern(s):
+The [built-in manifest](../host/src/manifest.toml) is compiled into `craft-host`; do not edit it to customize a deployed server. It lists the twelve apps of the Craft App Suite: the classic PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft and DesignCraft, and the new WordCraft, DeckCraft, GridCraft, CADCraft and SoundCraft. All of them are installed and kept up to date unless an administrator disables them in `/admin` or `config.toml` sets `enabled = false`. They are auto-updated on the stable channel, use `SHA256SUMS.txt` as a checksum-asset name, and serve under `/<entry>/` (stable URL) while versioned resources live at `/<entry>/<version>/`. An app's default `entry` is its ID; its default `release_dir` is `releases/<id>` under `DATA_DIR`.
 
-| ID / entry | Repository | ZIP artifact patterns | Manifest notes |
-| --- | --- | --- | --- |
-| `photocraft` | `storytold/photocraft` | `photocraft-web-{version}.zip` | Content-hashed assets; WebGPU requires a secure context, with WebGL2 fallback. |
-| `vectorcraft` | `storytold/vectorcraft` | `vectorcraft-web-{version}.zip` | Content-hashed assets; WebGPU requires a secure context, with WebGL2 fallback. |
-| `filmcraft` | `storytold/filmcraft` | `filmcraft-web-{version}.zip` | Projects use origin-scoped browser storage (OPFS); `icon = "favicon.png"`. |
-| `lightcraft` | `storytold/lightcraft` | `lightcraft-web-{version}.zip` | Experimental; origin-scoped browser library, one tab at a time, precompressed `.gz` copies. Manifest excludes unused native-build files (`.fingerprint/**`, `build/**`, `deps/**`, `examples/**`, `incremental/**`, `.cargo-lock`, `.cargo-build-lock`, `.cargo-artifact-lock`). |
-| `pdfcraft` | `storytold/printcraft` | `pdfcraft-web-{version}.zip`, `printcraft-web-{version}.zip` | Older artifacts were named `printcraft-web` (through v0.2.1); renamed `pdfcraft-web` from v0.4.0. |
-| `effectcraft` | `storytold/effectcraft` | `effectcraft-web-{version}.zip` | Release-scoped service worker; projects use origin-scoped browser storage; `icon = "favicon.svg"`. |
-| `designcraft` | `storytold/designcraft` | `designcraft-web-{version}.zip` | Content-hashed assets; WebGPU requires a secure context, with WebGL2 fallback. |
+Built-in apps follow the suite's conventions, so the manifest names only what differs:
 
-Manifest definitions also include each app's `name`, `category`, `tagline` and `color` for the launcher. A `[apps.<id>]` section with an existing ID overlays **only** operator settings; omitting it leaves all manifest/default values intact. Built-in apps allow exactly: `enabled`, `auto_update`, `pinned_version`, `channel`, `release_dir`, `entry`, `origin`, `activation`, `idle_after`, `keep_latest`, `keep_days`. A definition key (`name`, `repository`, `artifact_patterns`, `checksum_assets`, `exclude`, `icon`, `notes`, `category`, `tagline`, `color`) is rejected in a built-in app section even if its value equals the manifest value.
+- Name, tagline, brand colors, suite group and product page come from the ArtCraft Launcher catalogue vendored in [`host/assets/vendor/craft-launcher`](../host/assets/vendor/craft-launcher/README.md).
+- The repository is the catalogue's (`storytold/<id>`), and the artifact pattern is `<id>-web-{version}.zip` plus the same for every former ID: PdfCraft (repository `storytold/pdfcraft`, formerly `storytold/printcraft`) also matches `printcraft-web-{version}.zip`, its name through v0.2.1.
+- LightCraft excludes the unused native-build files its web archives contain (`.fingerprint/**`, `build/**`, `deps/**`, `examples/**`, `incremental/**`, `.cargo-lock`, `.cargo-build-lock`, `.cargo-artifact-lock`).
 
-An additional `[apps.<id>]` accepts **all** keys below and must define `name`, `repository` and a nonempty `artifact_patterns` list; it inherits the other defaults shown. IDs (and `entry`) are 1–63 ASCII bytes, start with a lowercase letter or digit, and otherwise contain only lowercase letters, digits or `-`. Entries must be unique; `admin`, `auth`, `launcher`, `healthz`, `readyz` and `status` are reserved. Release directories may not overlap, even for disabled apps.
+A `[apps.<id>]` section with an existing ID overlays **only** operator settings; omitting it leaves all manifest/default values intact. Built-in apps allow exactly: `enabled`, `auto_update`, `pinned_version`, `channel`, `release_dir`, `entry`, `origin`, `activation`, `idle_after`, `keep_latest`, `keep_days`. A definition key (`name`, `repository`, `artifact_patterns`, `checksum_assets`, `exclude`, `icon`, `notes`, `category`, `tagline`, `color`) is rejected in a built-in app section even if its value equals the manifest value.
+
+An additional `[apps.<id>]` accepts **all** keys below. It needs a `name` unless the ID is in the vendored catalogue, and otherwise defaults to the suite's conventions: `repository = "storytold/<id>"` and `artifact_patterns = ["<id>-web-{version}.zip"]`. A new Craft app is therefore just `[apps.examplecraft]` with `name = "ExampleCraft"`. IDs (and `entry`) are 1–63 ASCII bytes, start with a lowercase letter or digit, and otherwise contain only lowercase letters, digits or `-`. Entries must be unique; `admin`, `auth`, `launcher`, `healthz`, `readyz` and `status` are reserved. Release directories may not overlap, even for disabled apps.
 
 ### `[apps.<id>]` operator settings (built-in or additional)
 
 | Key | Type; default | Meaning and validation |
 | --- | --- | --- |
-| `enabled` | bool; `true` | Whether the app is included in serving and scheduled updates. |
+| `enabled` | bool; `true` | Whether the app is served and kept up to date. An administrator's choice in `/admin` takes precedence (it is stored in the app's state record while it differs from this value). A disabled app keeps its installed releases on disk. |
 | `auto_update` | bool; `true` | If `false`, allow initial installation but skip later automatic upgrades; manual `update` can still install. |
 | `pinned_version` | string; unset (`""` is also unset) | Pin to a semantic release version (e.g. `"0.5.0"`, optionally prefixed with `v`). Trims whitespace; a CLI/admin-set pin in persistent state takes precedence. |
 | `channel` | string; `"stable"` | `"stable"` excludes prereleases; `"prerelease"` also considers prereleases. |
@@ -141,18 +143,18 @@ An additional `[apps.<id>]` accepts **all** keys below and must define `name`, `
 
 | Key | Type; default | Meaning and validation |
 | --- | --- | --- |
-| `name` | string; **required** | App's displayed name; no further nonempty check. |
-| `repository` | string; **required** | GitHub `owner/name`; each side must be nonempty and contain only ASCII letters, digits, `_`, `.`, `-`. |
-| `artifact_patterns` | string list; **required, nonempty** | ZIP asset file names with `{version}` **exactly once** and no `/`, ending in `.zip`. Matched to release versions; exactly one matching asset per release is required. Multiple patterns support historical renames. |
+| `name` | string; the catalogue's name, else **required** | App's displayed name; no further nonempty check. |
+| `repository` | string; the catalogue's, else `"storytold/<id>"` | GitHub `owner/name`; each side must be nonempty and contain only ASCII letters, digits, `_`, `.`, `-`. |
+| `artifact_patterns` | string list; `["<id>-web-{version}.zip"]` (plus former catalogue IDs) | ZIP asset file names with `{version}` **exactly once** and no `/`, ending in `.zip`; nonempty. Matched to release versions; exactly one matching asset per release is required. Multiple patterns support historical renames. |
 | `checksum_assets` | string list; `["SHA256SUMS.txt"]` | Exact release-asset names sought for checksum verification. An asset's SHA-256 may also come from the GitHub API; releases without a usable digest are not installed. |
 | `exclude` | string list; `[]` | Archive exclusion patterns (e.g. `"build/**"`). For patterns not starting with `*`, validation requires a relative path without parent traversal after stripping a trailing `/**`; `"*"`, `"**"`, `"**/*"` and patterns starting with `index.html` are rejected to protect the entry page. |
-| `icon` | string; `""` | Optional path within a release for the launcher icon; if nonempty, must be relative without parent traversal. |
-| `notes` | string; `""` | App description/implementation notes in the definition. |
-| `category` | string; `""` | Short launcher category. |
-| `tagline` | string; `""` | One-line launcher description. |
-| `color` | string; `""` | Launcher brand color; if nonempty, `#` followed by exactly six ASCII hexadecimal digits. |
+| `icon` | string; `""` | Optional path within a release for the launcher icon; if nonempty, must be relative without parent traversal. Without it the launcher uses the release's own favicon (the first `<link rel="icon">` in `index.html` whose `href` is a plain relative path to a file in the release), else a monogram. |
+| `notes` | string; `""` | Implementation notes about the app, reported in `status.json`. |
+| `category` | string; `""` | Short label, reported in `status.json`. |
+| `tagline` | string; the catalogue's, else `""` | One-line launcher description. |
+| `color` | string; the catalogue's, else `""` | Launcher brand color; if nonempty, `#` followed by exactly six ASCII hexadecimal digits. |
 
-For a concrete built-in override or additional-app template, see [config.example.toml](../config.example.toml). That annotated example shows all global defaults and every built-in override key; additional apps supply the three required definition keys and may use the other definition keys above.
+For a concrete built-in override or additional-app template, see [config.example.toml](../config.example.toml). That annotated example shows all global defaults and every built-in override key.
 
 ## Process environment
 

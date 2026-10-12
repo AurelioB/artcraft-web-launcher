@@ -5,8 +5,8 @@ administration interface under `/admin/`.
 
 ## Administration interface
 
-`/admin/` shows every enabled app with its active, latest and pending release, pin, blocked
-releases, activation policy, last check and last error, and offers:
+`/admin/` shows every app with its active, latest and pending release, pin, blocked releases,
+activation policy, last check and last error, and offers:
 
 | Action | Effect |
 | --- | --- |
@@ -16,10 +16,19 @@ releases, activation policy, last check and last error, and offers:
 | Pin / Unpin | Hold the app on one release (installed if needed) / follow releases again |
 | Roll back | Activate a retained older release; the current one is blocked from reinstalling |
 | Allow | Permit a blocked release again |
+| Disable | Stop serving and updating the app; it disappears from the launcher and its URLs answer 404. Installed releases stay on disk |
+| Enable | Serve the app again and bring it up to date at once (installing it if it never was) |
+
+Every app is installed automatically unless it is disabled. Disabling and enabling take effect
+at once and survive restarts: the choice is stored in the app's state record and takes
+precedence over `enabled` in `config.toml` (it is dropped when it agrees with `config.toml`, which
+then governs again). The other actions are refused for a disabled app. If the install that
+follows Enable fails, the app stays enabled, shows the error and is retried on schedule like any
+other app.
 
 Actions run one at a time in the background, under the same lock as scheduled updates and the
-CLI; the page shows the running action, recent results and the update history. Every action is
-recorded with the signed-in user.
+CLI, so disabling waits for a running update of that app to finish; the page shows the running
+action, recent results and the update history. Every action is recorded with the signed-in user.
 
 The interface is **disabled by default** (`/admin` answers 404). Enable it with a sign-in
 method and a first administrator:

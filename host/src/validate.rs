@@ -30,6 +30,10 @@ static REF_RE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r#"["'`]([^"'`\s<>()]+?\.(?:m?js|wasm|css|png|svg|ico|webmanifest|json|jpe?g|webp|gif|woff2?|ttf|otf))(?:\?[^"'`\s]*)?["'`]"#)
         .unwrap()
 });
+static LINK_RE: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?is)<link\b[^>]*>").unwrap());
+static ATTR_RE: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r#"(?is)\s(rel|href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))"#).unwrap()
+});
 
 #[derive(Debug)]
 pub enum ValidationError {
@@ -60,6 +64,8 @@ pub struct Report {
     pub compressible: Vec<String>,
     pub js_files: Vec<String>,
     pub references: Vec<String>,
+    /// The page's own icon (see [`favicon`]), relative to the release root.
+    pub favicon: Option<String>,
     pub warnings: Vec<String>,
 }
 
@@ -201,6 +207,9 @@ pub fn validate_tree(root: &Path, icon: &str, limit: u64) -> Result<Report, Vali
         let p = root.join(name);
         if p.is_file() {
             let text = fs::read_to_string(&p).unwrap_or_default();
+            if *name == "index.html" {
+                report.favicon = favicon(root, &text);
+            }
             scan.push((p, references(&text)));
         }
     }
@@ -268,6 +277,42 @@ pub fn validate_tree(root: &Path, icon: &str, limit: u64) -> Result<Report, Vali
         ));
     }
     Ok(report)
+}
+
+/// The entry page's icon: the first `<link rel="icon">` (or `"shortcut icon"`) whose `href` is a
+/// plain relative path to a file inside the release. URLs with a scheme, a query, a fragment,
+/// percent-escapes or a root-absolute path, and paths leaving the release, are ignored, so the
+/// result can be appended to the release's URL as is.
+pub fn favicon(root: &Path, index_html: &str) -> Option<String> {
+    LINK_RE.find_iter(index_html).find_map(|tag| {
+        let (mut rel, mut href) = ("", "");
+        for c in ATTR_RE.captures_iter(tag.as_str()) {
+            let value = (2..=4).find_map(|i| c.get(i)).map_or("", |m| m.as_str());
+            match c[1].to_ascii_lowercase().as_str() {
+                "rel" => rel = value,
+                _ => href = value,
+            }
+        }
+        if !rel
+            .split_ascii_whitespace()
+            .any(|t| t.eq_ignore_ascii_case("icon"))
+        {
+            return None;
+        }
+        let href = href.trim();
+        if href.is_empty()
+            || href.starts_with('/')
+            || !href
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"._-/".contains(&b))
+        {
+            return None;
+        }
+        let target = resolve(root, root, href)?;
+        root.join(&target)
+            .is_file()
+            .then(|| target.to_string_lossy().into_owned())
+    })
 }
 
 fn encode_path(rel: &str) -> String {
@@ -397,6 +442,56 @@ mod tests {
         ]);
         let r = validate_tree(d.path(), "", 1 << 30).unwrap();
         assert_eq!(r.compressible, ["large.wasm"]);
+    }
+
+    #[test]
+    fn favicon_is_a_plain_relative_path_inside_the_release() {
+        let d = site(&[
+            ("wordcraft-fa59e09a3f921e03.ico", b"i"),
+            ("img/ai.storyteller.deckcraft-74e9.png", b"p"),
+            ("secret.txt", b"s"),
+        ]);
+        let found = |html: &str| favicon(d.path(), html);
+        // Hashed names as the Craft apps ship them, any attribute order and quoting.
+        assert_eq!(
+            found(
+                r#"<link rel="icon" href="./wordcraft-fa59e09a3f921e03.ico" integrity="sha384-x">"#
+            )
+            .as_deref(),
+            Some("wordcraft-fa59e09a3f921e03.ico")
+        );
+        assert_eq!(
+            found("<LINK href=img/ai.storyteller.deckcraft-74e9.png REL='shortcut icon'>")
+                .as_deref(),
+            Some("img/ai.storyteller.deckcraft-74e9.png")
+        );
+        // The first usable link wins; unusable ones are skipped.
+        assert_eq!(
+            found(
+                r#"<link rel="icon" href="https://evil.example/x.ico">
+                <link rel="icon" href="missing.ico">
+                <link rel="icon" href="./wordcraft-fa59e09a3f921e03.ico">"#
+            )
+            .as_deref(),
+            Some("wordcraft-fa59e09a3f921e03.ico")
+        );
+        // No icon link (CADCraft), other rels, and unsafe references give nothing.
+        for html in [
+            "<html><head><title>CADCraft</title></head></html>",
+            r#"<link rel="stylesheet" href="secret.txt">"#,
+            r#"<link data-rel="icon" href="secret.txt">"#,
+            r#"<link rel="apple-touch-icon" href="secret.txt">"#,
+            r#"<link rel="icon" href="/secret.txt">"#,
+            r#"<link rel="icon" href="../secret.txt">"#,
+            r#"<link rel="icon" href="secret.txt?v=1">"#,
+            r#"<link rel="icon" href="secret.txt#x">"#,
+            r#"<link rel="icon" href="secret%2etxt">"#,
+            r#"<link rel="icon" href="data:image/png;base64,AA==">"#,
+            r#"<link rel="icon" href="javascript:alert(1)">"#,
+            r#"<link rel="icon" href="img">"#,
+        ] {
+            assert_eq!(found(html), None, "{html}");
+        }
     }
 
     #[test]

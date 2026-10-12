@@ -27,6 +27,8 @@ pub struct AppStatus {
     /// "ready", "installing", "failed" or "disabled".
     pub state: String,
     pub enabled: bool,
+    /// "admin" when /admin overrides config.toml's `enabled`, else "config".
+    pub enabled_by: &'static str,
     pub active: Option<String>,
     pub active_url: Option<String>,
     /// Logo URL relative to the site root: the official logo for built-in apps, otherwise the
@@ -36,6 +38,18 @@ pub struct AppStatus {
     pub tagline: String,
     /// Brand color, `#rrggbb`, or empty.
     pub color: String,
+    /// Colors for text on light and dark backgrounds, `#rrggbb`, or empty.
+    pub ink_light: String,
+    pub ink_dark: String,
+    /// Suite group: "classic", "new", or empty for apps outside the Craft App catalogue.
+    pub group: String,
+    /// GitHub `owner/name`.
+    pub repository: String,
+    /// Product page, or empty.
+    pub website: String,
+    /// Git tag and publication time of the active release.
+    pub release_tag: Option<String>,
+    pub released: Option<String>,
     /// Installed release waiting for the app to be idle.
     pub pending: Option<String>,
     /// "immediate" or "idle".
@@ -63,9 +77,16 @@ pub struct UpdaterStatus {
 }
 
 #[derive(Serialize)]
+pub struct LauncherStatus {
+    /// Whether `launcher/shots/…` can deliver upstream screenshots.
+    pub screenshots: bool,
+}
+
+#[derive(Serialize)]
 pub struct Status {
     pub generated_at: String,
     pub updater: UpdaterStatus,
+    pub launcher: LauncherStatus,
     pub apps: Vec<AppStatus>,
 }
 
@@ -129,7 +150,8 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
             }
         }
     });
-    let st = if !app.enabled {
+    let enabled = cfg.is_enabled(app);
+    let st = if !enabled {
         "disabled"
     } else if active.is_some() {
         "ready"
@@ -138,35 +160,53 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
     } else {
         "installing"
     };
+    let active_record = active.as_ref().and_then(|v| state.installed.get(v));
     // Links are relative to the launcher, or absolute when the app has its own origin.
     let base = app
         .origin
         .as_ref()
         .map(|o| format!("{o}/"))
         .unwrap_or_default();
+    // The official logo, else the configured icon, else the release's own favicon.
+    let release_icon = |icon: &str| {
+        active
+            .as_ref()
+            .filter(|v| {
+                !icon.is_empty() && cfg.release_root(app).join(v.as_str()).join(icon).is_file()
+            })
+            .map(|v| format!("{}/{v}/{icon}", app.entry))
+    };
     AppStatus {
         id: app.id.clone(),
         name: app.name.clone(),
         url: format!("{base}{}/", app.entry),
         state: st.into(),
-        enabled: app.enabled,
+        enabled,
+        enabled_by: cfg.enabled_by(app),
         active_url: active.as_ref().map(|v| format!("{base}{}/{v}/", app.entry)),
-        icon: crate::assets::logo(&app.id).or_else(|| {
-            active
-                .as_ref()
-                .filter(|v| {
-                    !app.icon.is_empty()
-                        && cfg
-                            .release_root(app)
-                            .join(v.as_str())
-                            .join(&app.icon)
-                            .is_file()
-                })
-                .map(|v| format!("{}/{v}/{}", app.entry, app.icon))
-        }),
+        icon: crate::assets::logo(&app.id)
+            .or_else(|| release_icon(&app.icon))
+            .or_else(|| release_icon(active_record.and_then(|r| r.icon.as_deref())?)),
         category: app.category.clone(),
         tagline: app.tagline.clone(),
         color: app.color.clone(),
+        ink_light: app.ink_light.clone(),
+        ink_dark: app.ink_dark.clone(),
+        group: app.group.clone(),
+        repository: app.repository.clone(),
+        website: app.website.clone(),
+        release_tag: active_record.map(|r| r.tag.clone()),
+        released: active_record
+            .and_then(|r| r.published_at.clone())
+            .or_else(|| {
+                // Releases installed before 0.2 did not record it; the newest seen release did.
+                state
+                    .latest_seen
+                    .as_ref()
+                    .filter(|s| active.as_deref() == Some(s.version.as_str()))
+                    .map(|s| s.published_at.clone())
+                    .filter(|p| !p.is_empty())
+            }),
         active,
         pending: state.pending.clone(),
         activation: match app.activation {
@@ -193,7 +233,7 @@ pub fn build(cfg: &Config, store: &Store, public: bool) -> Status {
     let apps = cfg
         .apps
         .iter()
-        .filter(|a| a.enabled || !public)
+        .filter(|a| !public || cfg.is_enabled(a))
         .map(|a| match store.load(&a.id) {
             Ok(state) => app_status(cfg, a, &state, public),
             Err(e) => {
@@ -223,6 +263,9 @@ pub fn build(cfg: &Config, store: &Store, public: bool) -> Status {
             heartbeat_at: hb.as_ref().map(|h| h.at.clone()),
             phase: hb.map(|h| h.phase),
             check_interval_seconds: cfg.updater.check_interval_secs,
+        },
+        launcher: LauncherStatus {
+            screenshots: cfg.launcher.screenshots_url.is_some(),
         },
         apps,
     }

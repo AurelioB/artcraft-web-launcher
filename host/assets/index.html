@@ -12,41 +12,42 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="wrap topbar-inner">
-      <a class="brand" href="./">
-        <img src="launcher/icons/artcraft.svg" alt="" width="26" height="22">
-        <span class="font-display">Craft Apps</span>
-      </a>
-      <div class="topbar-end">
-        <span class="hud-label" id="summary">Self-hosted</span>
-        <nav class="account hud-label" id="account" aria-label="Account" hidden>
-          <span id="account-name"></span>
-          <a id="account-admin" href="admin/" hidden>Admin</a>
-          <a id="account-link" hidden></a>
-          <button type="button" id="account-logout" hidden>Sign out</button>
-        </nav>
+    <a class="brand" href="./"><img src="launcher/icons/artcraft.svg" alt="" width="26" height="22"><span>Craft Apps</span></a>
+    <span class="suite hud-label" data-i18n="Craft App Suite">Craft App Suite</span>
+    <div class="topbar-end">
+      <div class="view-switch segments" role="group" aria-label="View">
+        <button type="button" data-view="grid" data-i18n="Grid" aria-pressed="true">Grid</button>
+        <button type="button" data-view="table" data-i18n="Table" aria-pressed="false">Table</button>
       </div>
+      <label class="theme-control"><span class="sr-only">Theme</span><select id="theme"><option value="system" data-i18n="Match system">Match system</option><option value="dark" data-i18n="Dark">Dark</option><option value="light" data-i18n="Light">Light</option></select></label>
+      <nav class="account" id="account" aria-label="Account" hidden>
+        <span id="account-name"></span>
+        <a id="account-admin" href="admin/" hidden>Admin</a>
+        <a id="account-link" hidden></a>
+        <button type="button" id="account-logout" hidden>Sign out</button>
+      </nav>
     </div>
   </header>
-
   <main class="wrap lineup">
     <div id="notices" role="status" aria-live="polite"></div>
-
-    <section aria-labelledby="lineup-title">
-      <div class="section-head">
-        <h1 class="hud-label" id="lineup-title">The lineup</h1>
-        <span class="hud-label faint" id="count"></span>
+    <div id="list-view">
+      <div class="toolbar">
+        <div id="filters" class="segments" role="group" aria-label="Filter"></div>
+        <span id="count" class="hud-label faint" aria-live="polite"></span>
+        <div class="search-sort">
+          <label class="sort-control"><span class="hud-label faint" data-i18n="Sort">Sort</span><select id="sort"><option value="suite" data-i18n="Suite order">Suite order</option><option value="name" data-i18n="Name">Name</option><option value="newest" data-i18n="Newest release">Newest release</option></select></label>
+          <label><span class="sr-only" data-i18n="Search apps">Search apps</span><input id="search" type="search" placeholder="Search apps" autocomplete="off"></label>
+        </div>
       </div>
-      <div id="apps" class="grid" aria-busy="true">
-        <p class="placeholder">Loading app list…</p>
-      </div>
-    </section>
+      <div id="apps" aria-busy="true"><p class="placeholder">Loading app list…</p></div>
+    </div>
+    <section id="details-view" aria-labelledby="details-name" hidden></section>
   </main>
-
   <footer class="wrap footer">
+    <p id="updated" class="hud-label faint"></p>
     <p>Documents and libraries live in this browser for this address. Export or back them up from inside each app; a different host name or port starts with empty storage.</p>
-    <p class="hud-label faint"><span id="updated"></span></p>
     <p class="faint">Apps and logos by <a href="https://getartcraft.com/apps" rel="noopener">ArtCraft</a>. Fonts: Archivo and Geist Mono (SIL Open Font License).</p>
+    <p class="faint"><a href="https://github.com/storytold/craft-launcher" rel="noopener">Design, app pages and translations from ArtCraft Launcher (MIT/Apache-2.0)</a>.</p>
   </footer>
 </body>
 </html>

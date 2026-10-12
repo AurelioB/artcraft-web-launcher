@@ -687,6 +687,8 @@ impl<'a> Updater<'a> {
             sha256: sha256.into(),
             installed_at: now_iso(),
             size: written,
+            published_at: Some(c.published_at.clone()).filter(|p| !p.is_empty()),
+            icon: report.favicon.clone(),
         };
         layout::write_marker(&site, &record).map_err(io_stage("extract"))?;
         let added = precompress::precompress_tree(&site)
@@ -922,6 +924,32 @@ impl<'a> Updater<'a> {
             ));
         }
         Ok(msg)
+    }
+
+    /// An administrator's choice to serve and update the app or not. The caller holds the
+    /// updater lock, so no update of this app is running. Disabling keeps installed releases on
+    /// disk; enabling brings the app up to date at once. The choice is stored only while it
+    /// differs from config.toml, which governs again otherwise.
+    pub fn set_enabled(&self, app: &AppConfig, enabled: bool) -> Result<String> {
+        let mut state = self.store.load(&app.id)?;
+        let choice = (enabled != app.enabled).then_some(enabled);
+        state.enabled = choice;
+        self.store.save(&app.id, &state)?;
+        self.cfg.set_switch(&app.id, choice);
+        let action = if enabled { "enable" } else { "disable" };
+        self.store.record(&app.id, action, "ok", None, "")?;
+        if !enabled {
+            return Ok(format!(
+                "{}: disabled; no longer served or updated (installed releases are kept)",
+                app.id
+            ));
+        }
+        layout::ensure_app(self.cfg, app)?;
+        Ok(format!(
+            "{}: enabled; {}",
+            app.id,
+            self.update_app(app, true)
+        ))
     }
 }
 

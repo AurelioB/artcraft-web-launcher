@@ -8,10 +8,11 @@
   (`release-assets.githubusercontent.com` as of October 2026) for updates. Installed apps keep
   being served without it.
 - An HTTPS reverse proxy for anything other than `localhost` (see [HTTPS](#https-and-the-reverse-proxy)).
-- Disk: one release of each of the seven apps took about 280 MB in `DATA_DIR` before
-  precompression; the `.br`/`.gz` copies written at install time add roughly half of that. The
-  downloaded archives took about 160 MB in `CACHE_DIR` (October 2026 releases). Retention keeps
-  several releases per app; the archive cache is bounded by `cache_max_size`.
+- Disk: one release of each of the twelve apps took about 730 MB in `DATA_DIR`, of which about
+  300 MB are `.br`/`.gz` copies (written at install time, or shipped by LightCraft). The
+  downloaded archives take about 250 MB in `CACHE_DIR` (12 October 2026 releases; LightCraft's
+  alone is 100 MB). `keep_latest` can retain more releases per app; the archive cache is bounded
+  by `cache_max_size`.
 
 ## 1. Choose identity and directories
 
@@ -47,7 +48,7 @@ sudo install -m 0640 -o "$RUN_UID" -g "$RUN_GID" config.example.toml /srv/craft-
 ```
 
 Optional GitHub token (raises the API limit from 60 to 5000 requests per hour, and unchanged
-release lists then cost no quota). Hourly checks of seven apps use 7 requests per hour without
+release lists then cost no quota). Hourly checks of twelve apps use 12 requests per hour without
 one, but the 60 are shared by everything behind the same public IP address:
 
 ```sh
@@ -76,7 +77,7 @@ interface). Docker-published ports bypass host firewalls such as ufw; set `BIND_
 address (for example the LAN address, or `127.0.0.1` behind a local proxy) to narrow it.
 
 Plain HTTP from another machine is not a secure context. Observed in Chromium over
-`http://<LAN address>`: all seven apps load and show their start screens, but `navigator.gpu`
+`http://<LAN address>`: the seven classic apps load and show their start screens, but `navigator.gpu`
 (WebGPU) and the Origin Private File System are unavailable, as is the clipboard API. According
 to the apps' own hosting notes, rendering then falls back to WebGL2, and EffectCraft and LightCraft
 fall back from OPFS to IndexedDB (EffectCraft: or memory only, which keeps nothing after the tab

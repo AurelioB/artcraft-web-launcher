@@ -1,27 +1,36 @@
 # Applications
 
-Survey of the official releases, 8 October 2026. The built-in manifest is
-`updater/src/manifest.toml`.
+Survey of the official releases, 12 October 2026 (the first seven were also surveyed in detail
+on 8 October). The built-in manifest is `host/src/manifest.toml`; names, taglines, colors and
+app pages come from the ArtCraft Launcher catalogue vendored in `host/assets/vendor/craft-launcher`.
 
-| App | Repository | Web artifact | Version checked | Expanded | Notes |
-| --- | --- | --- | --- | --- | --- |
-| PhotoCraft | `storytold/photocraft` | `photocraft-web-{v}.zip` | 0.5.0 | 22 MB | content-hashed asset names |
-| VectorCraft | `storytold/vectorcraft` | `vectorcraft-web-{v}.zip` | 0.7.0 | 48 MB | content-hashed asset names |
-| FilmCraft | `storytold/filmcraft` | `filmcraft-web-{v}.zip` | 0.4.0 | 40 MB | assets loaded with `?v=<build>` |
-| LightCraft | `storytold/lightcraft` | `lightcraft-web-{v}.zip` | 0.4.0 | 37 MB published (170 MB archive contents) | archive also holds a Cargo target dir; precompressed `.gz`/`.br` copies |
-| PdfCraft | `storytold/printcraft` | `pdfcraft-web-{v}.zip` (≤ 0.2.1: `printcraft-web-{v}.zip`) | 0.4.0 | 34 MB | repository and artifact names differ |
-| EffectCraft | `storytold/effectcraft` | `effectcraft-web-{v}.zip` | 0.6.0 | 57 MB | service worker, web manifest |
-| DesignCraft | `storytold/designcraft` | `designcraft-web-{v}.zip` | 0.4.0 | 41 MB | content-hashed asset names |
+| App | Group | Repository | Web artifact | Version checked | Archive contents | Notes |
+| --- | --- | --- | --- | --- | --- | --- |
+| PhotoCraft | classic | `storytold/photocraft` | `photocraft-web-{v}.zip` | 0.7.0 | 25 MB | content-hashed asset names |
+| VectorCraft | classic | `storytold/vectorcraft` | `vectorcraft-web-{v}.zip` | 0.10.0 | 63 MB | content-hashed asset names |
+| FilmCraft | classic | `storytold/filmcraft` | `filmcraft-web-{v}.zip` | 0.6.0 | 44 MB | assets loaded with `?v=<build>` |
+| LightCraft | classic | `storytold/lightcraft` | `lightcraft-web-{v}.zip` | 0.6.0 | 203 MB, 425 of 452 entries an unused Cargo target dir | precompressed `.gz`/`.br` copies |
+| PdfCraft | classic | `storytold/pdfcraft` (formerly `printcraft`, which redirects) | `pdfcraft-web-{v}.zip` (≤ 0.2.1: `printcraft-web-{v}.zip`) | 0.7.1 | 38 MB | |
+| EffectCraft | classic | `storytold/effectcraft` | `effectcraft-web-{v}.zip` | 0.8.0 | 61 MB | service worker, web manifest |
+| DesignCraft | classic | `storytold/designcraft` | `designcraft-web-{v}.zip` | 0.6.0 | 43 MB | content-hashed asset names |
+| WordCraft | new | `storytold/wordcraft` | `wordcraft-web-{v}.zip` | 0.6.1 | 40 MB | content-hashed favicon |
+| DeckCraft | new | `storytold/deckcraft` | `deckcraft-web-{v}.zip` | 0.6.1 | 24 MB | content-hashed favicon |
+| GridCraft | new | `storytold/gridcraft` | `gridcraft-web-{v}.zip` | 0.6.1 | 19 MB | content-hashed favicon |
+| CADCraft | new | `storytold/cadcraft` | `cadcraft-web-{v}.zip` | 0.6.2 | 21 MB | no favicon link |
+| SoundCraft | new | `storytold/soundcraft` | `soundcraft-web-{v}.zip` | 0.6.1 | 15 MB | WebAudio; no `SharedArrayBuffer` |
 
-Common to all seven:
+Common to all twelve:
 
 - Each release also publishes desktop packages and `SHA256SUMS.txt`; the GitHub API reports a
-  SHA-256 digest for every asset. Both matched the downloaded web archives.
+  SHA-256 digest for every asset. The web archives of the versions above matched their
+  `SHA256SUMS.txt`.
 - The archive holds one top-level directory `<artifact>-web-<version>/` with `index.html`,
   wasm-bindgen glue and one WebAssembly module, plus `HOSTING.md`, `_headers` and `.htaccess`.
+  None ships native executables outside LightCraft's excluded Cargo target directory.
 - `index.html` uses relative URLs only, so every app works under a path prefix such as
   `/photocraft/` (stable URL) or `/photocraft/0.5.0/` (a retained release).
-- Requirements from upstream `HOSTING.md`: `.wasm` as `application/wasm`, `.js` as
+- Requirements from upstream `HOSTING.md` (read for WordCraft and SoundCraft; the first seven
+  were read on 8 October) and `_headers` (all twelve): `.wasm` as `application/wasm`, `.js` as
   `text/javascript`, gzip or Brotli compression, HTTPS (or localhost) for WebGPU, clipboard and
   storage. No cross-origin isolation headers are needed.
 - Some releases reuse the same asset names across versions (EffectCraft, LightCraft). At the
@@ -36,7 +45,8 @@ Common to all seven:
 
 `lightcraft-web-0.4.0.zip` contains 572 entries, 549 of which are a Cargo target directory
 (`build/`, `deps/`, `.fingerprint/`, `examples/`, `incremental/`, `.cargo-*lock`) with native
-build scripts, `.so` and `.rlib` files. The site never references them. The manifest excludes
+build scripts, `.so` and `.rlib` files; in 0.6.0 it is 425 of 452 entries. The site never
+references them. The manifest excludes
 these paths (documented configuration, not patching); without the exclusion the updater rejects
 the release because it contains native executables. The remaining files, including the
 precompressed copies, are published unchanged; shipped `.gz`/`.br` copies are verified to
@@ -52,7 +62,8 @@ releases.
 
 ## Browser storage
 
-All apps on one host share an origin. Observed after using all seven on one origin:
+All apps on one host share an origin. Observed on 8 October after using the seven classic apps
+on one origin (the five new apps have not been surveyed for storage names yet):
 
 | Kind | Names |
 | --- | --- |

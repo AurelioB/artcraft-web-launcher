@@ -121,3 +121,39 @@ only the server changed):
 - User-namespace remapping and Docker Desktop; hourly scheduling over long periods.
 - Access from another device on the LAN: the LAN address was exercised from a browser on the
   server itself.
+
+## 0.2.0 (12 October 2026)
+
+`cargo test` (unit 53, lifecycle 17, HTTP/admin 14): all passed, with `cargo clippy
+--all-targets -- -D warnings` clean. New coverage: catalogue defaults and the suite's naming
+conventions for built-in and additional apps; admin choices overriding `config.toml` and shared
+by every holder of the configuration; favicon discovery (content-hashed names, quoting, unsafe
+and external references, no icon link); disabling and enabling through `/admin` (only for
+administrators with the CSRF token; stable, versioned and `readyz` URLs 404 and status omits the
+app; other actions refused; a restarted server keeps it disabled and scheduled cycles skip it;
+enabling installs the newest release and returns control to `config.toml`); the screenshot proxy
+(fetched once then cached, non-JPEG refused without an immediate retry, unknown pictures and
+disabled apps never fetched).
+
+Against GitHub with the release binary:
+
+- **Upgrade of the 0.1 demo state** (seven classic apps installed): on start the five new apps
+  were installed within 30 s (each archive checksum-verified, served-check passed); the classic
+  apps stayed and a manual update found all twelve current, PdfCraft through `storytold/pdfcraft`.
+  Install-time favicon discovery recorded WordCraft's, DeckCraft's, GridCraft's and SoundCraft's
+  content-hashed icons and none for CADCraft. Releases installed by 0.1 show their date from the
+  last check.
+- **Fresh state, default configuration**: `craft-host update` installed and activated all twelve
+  apps in 74 s; `status` listed all twelve ready.
+- **Browser (headless Chromium)**: launcher grid and table views (dark and light), German
+  (`?lang=de`: UI strings, taglines, `12 Apps`, dates), a 390 px viewport without horizontal
+  scrolling, and SoundCraft's app page with its four screenshots fetched by the server from the
+  pinned upstream tag; no console errors. The five new apps' pages, scripts and WebAssembly
+  modules loaded with no failed requests (CADCraft: only the browser's own `/favicon.ico` probe);
+  this headless browser has neither WebGL2 nor WebGPU, so the apps reported that and did not
+  render. In `/admin`, Disable removed DeckCraft from the launcher and made its stable and
+  versioned URLs answer 404; after a server restart it was still disabled; Enable restored it.
+
+Not verified for 0.2.0: the five new apps rendering and editing in a browser with a GPU; their
+browser-storage names; translations other than German and Russian (Russian only against a
+fixture).

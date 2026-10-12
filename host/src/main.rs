@@ -108,8 +108,14 @@ fn apps<'c>(
     match app {
         Some(id) => {
             let a = cfg.app(id).map_err(|e| e.to_string())?;
-            if !a.enabled {
-                return Err(format!("{id} is disabled in config.toml"));
+            if !cfg.is_enabled(a) {
+                return Err(format!(
+                    "{id} is disabled ({})",
+                    match cfg.enabled_by(a) {
+                        "admin" => "in /admin",
+                        _ => "in config.toml",
+                    }
+                ));
             }
             Ok(vec![a])
         }

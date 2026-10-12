@@ -3,6 +3,36 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.0] - 2026-10-12
+
+### Added
+
+- WordCraft, DeckCraft, GridCraft, CADCraft and SoundCraft, the five new apps of the Craft App
+  Suite. Like the seven classic apps, they are installed and kept up to date automatically.
+- Administrators can disable and enable apps in `/admin`. A disabled app is no longer served,
+  listed or updated (its releases stay on disk); enabling it brings it up to date at once. The
+  choice survives restarts and takes precedence over `enabled` in `config.toml`.
+- A launcher in the style of the official ArtCraft Launcher: grid and table views, filters,
+  sorting, search, the suite's groups, app pages with features and screenshots, and the
+  launcher's translations (Czech, German, Spanish, French, Hungarian, Japanese, Polish, Brazilian
+  Portuguese, Russian and Simplified Chinese). Its catalogue, texts and translations are vendored
+  from `storytold/craft-launcher` (MIT OR Apache-2.0) by `scripts/sync-craft-launcher.py`.
+- `[launcher] screenshots_url`: the server fetches app-page screenshots once from the pinned
+  upstream tag and caches them; browsers never contact GitHub. `""` turns them off.
+- `status.json` reports each app's repository, product page, suite group, text colors, active
+  release tag and publication date, and whether `/admin` overrides `enabled`.
+
+### Changed
+
+- Apps follow the suite's naming conventions by default: repository `storytold/<id>` and archive
+  `<id>-web-{version}.zip` (plus former names). A Craft app added in `config.toml` needs only
+  `name`; `repository` and `artifact_patterns` are optional.
+- Names, taglines and colors of built-in apps come from the vendored catalogue; taglines are
+  now the launcher's short descriptions.
+- PdfCraft is fetched from `storytold/pdfcraft`, the repository's new name.
+- Without a configured `icon`, the launcher shows a release's own favicon (found in its
+  `index.html` at install time) instead of a monogram.
+
 ## [0.1.1] - 2026-10-10
 
 ### Fixed
@@ -32,4 +62,6 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.2.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.0
+[0.1.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.1
 [0.1.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.0

@@ -1,0 +1,52 @@
+[
+  {
+    "code": "ru",
+    "name": "Русский",
+    "plural": "east_slavic"
+  },
+  {
+    "code": "zh-CN",
+    "name": "简体中文",
+    "plural": "none"
+  },
+  {
+    "code": "de",
+    "name": "Deutsch",
+    "plural": "one_other"
+  },
+  {
+    "code": "fr",
+    "name": "Français",
+    "plural": "zero_one"
+  },
+  {
+    "code": "pt-BR",
+    "name": "Português (Brasil)",
+    "plural": "one_other"
+  },
+  {
+    "code": "es",
+    "name": "Español",
+    "plural": "one_other"
+  },
+  {
+    "code": "cs",
+    "name": "Čeština",
+    "plural": "czech"
+  },
+  {
+    "code": "pl",
+    "name": "Polski",
+    "plural": "polish"
+  },
+  {
+    "code": "hu",
+    "name": "Magyar",
+    "plural": "one_other"
+  },
+  {
+    "code": "ja",
+    "name": "日本語",
+    "plural": "none"
+  }
+]

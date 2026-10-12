@@ -39,6 +39,7 @@ pub struct Shared {
     pub throttle: Throttle,
     pub oidc: Option<Oidc>,
     pub jobs: Jobs,
+    pub shots: crate::shots::Shots,
 }
 
 impl Shared {
@@ -54,6 +55,7 @@ impl Shared {
             throttle: Throttle::default(),
             oidc,
             jobs: Jobs::default(),
+            shots: crate::shots::Shots::default(),
             cfg,
             activity,
         }))
@@ -95,6 +97,33 @@ async fn launcher_asset(Path(path): Path<String>) -> Response<Body> {
     res
 }
 
+/// `/launcher/shots/<app>/<key>.jpg`: an upstream screenshot, fetched once and cached.
+async fn launcher_shot(
+    State(s): State<Arc<Shared>>,
+    Path((app, file)): Path<(String, String)>,
+) -> Response<Body> {
+    let Some(key) = file.strip_suffix(".jpg").map(str::to_string) else {
+        return simple(StatusCode::NOT_FOUND, "not found\n");
+    };
+    let shared = s.clone();
+    let found = tokio::task::spawn_blocking(move || shared.shots.get(&shared.cfg, &app, &key))
+        .await
+        .ok()
+        .flatten();
+    let Some(bytes) = found else {
+        return simple(StatusCode::NOT_FOUND, "not found\n");
+    };
+    let mut res = Response::new(Body::from(bytes));
+    res.headers_mut()
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static("image/jpeg"));
+    // The pictures are pinned to an upstream tag; a new tag comes with a new image.
+    res.headers_mut().insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=86400"),
+    );
+    set_common_headers(&mut res);
+    res
+}
 async fn healthz() -> Response<Body> {
     let mut r = simple(StatusCode::OK, "ok\n");
     r.headers_mut()
@@ -263,6 +292,7 @@ async fn host_gate(
 pub fn router(shared: Arc<Shared>) -> Router {
     Router::new()
         .route("/", get(launcher))
+        .route("/launcher/shots/{app}/{file}", get(launcher_shot))
         .route("/launcher/{*path}", get(launcher_asset))
         .route("/status.json", get(status_json))
         .route("/healthz", get(healthz))
