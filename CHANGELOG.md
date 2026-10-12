@@ -3,6 +3,15 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.1] - 2026-10-12
+
+### Security
+
+- With `[auth] apps = "signed-in"`, launcher screenshots (`/launcher/shots/…`) now need a
+  signed-in account like the apps. In 0.2.0 they were open to anyone: the pictures are public
+  upstream, but their availability showed which apps are enabled and an anonymous visitor could
+  make the server fetch them.
+
 ## [0.2.0] - 2026-10-12
 
 ### Added
@@ -62,6 +71,7 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.2.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.1
 [0.2.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.0
 [0.1.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.1
 [0.1.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.0

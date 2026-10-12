@@ -107,7 +107,7 @@ Used with `methods = ["proxy"]`. Header names must be nonempty and contain only 
 
 | Key | Type; default | Meaning and validation |
 | --- | --- | --- |
-| `screenshots_url` | string; the pinned tag of `storytold/craft-launcher-assets` (`https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1`) | Where the server fetches the screenshots shown on the launcher's app pages: `<url>/<app>/<key>.jpg`, only for pictures named in the vendored catalogue and only for enabled apps. Each picture is fetched once (JPEG only, at most 2 MiB, `[updater] http_timeout`) and kept in `CACHE_DIR/shots`; browsers never contact the source. A failed picture is not requested again for 10 minutes. Must be an `http(s)` URL; `""` turns screenshots off. |
+| `screenshots_url` | string; the pinned tag of `storytold/craft-launcher-assets` (`https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1`) | Where the server fetches the screenshots shown on the launcher's app pages: `<url>/<app>/<key>.jpg`, only for pictures named in the vendored catalogue and only for enabled apps. Each picture is fetched once (JPEG only, at most 2 MiB, `[updater] http_timeout`) and kept in `CACHE_DIR/shots`; browsers never contact the source. A failed picture is not requested again for 10 minutes. With `[auth] apps = "signed-in"`, screenshots need a signed-in account like the apps (the launcher's other static files do not). Must be an `http(s)` URL; `""` turns screenshots off. |
 
 ## Apps and the built-in manifest
 
@@ -176,10 +176,10 @@ These are read directly by the binary (not from `config.toml`). For path overrid
 
 ## Persistent files and permissions
 
-- `STATE_DIR/apps/<id>.json`: per-app installed/active/pending release state, pins, blocked versions, check results and failures. `STATE_DIR/history.jsonl`: update events, trimmed after exceeding 2 MiB to the last 5000 lines. `STATE_DIR/locks/updater.lock`: advisory cross-process lock; `STATE_DIR/heartbeat.json`: updater status and timestamp.
+- `STATE_DIR/apps/<id>.json`: per-app installed/active/pending release state, pins, an administrator's enable/disable choice, blocked versions, check results and failures. `STATE_DIR/history.jsonl`: update events, trimmed after exceeding 2 MiB to the last 5000 lines. `STATE_DIR/locks/updater.lock`: advisory cross-process lock; `STATE_DIR/heartbeat.json`: updater status and timestamp.
 - `STATE_DIR/users.sqlite3`: SQLite accounts, password hashes, roles and linked OIDC identities; SQLite WAL operation can create `users.sqlite3-wal` and `users.sqlite3-shm`. On creation the database is set to mode `0660`; doctor rejects access by users outside its owner/group. Keep state private and persistent.
 - `DATA_DIR/<release_dir>/<version>/`: immutable installed static site and `.craft-release.json` release marker. `DATA_DIR/<release_dir>/current` is the atomically swapped symlink to the active version. `DATA_DIR/.staging/` holds unpublished validated sites and temporary trash; it must share a filesystem with release directories for atomic promotion. Published release contents are made read-only; retain data to survive restarts.
-- `CACHE_DIR/archives/<id>/<asset name>`: downloaded ZIPs, verified before reuse, pruned by `cache_max_size`. `CACHE_DIR/api/<owner>__<repo>.json`: cached release list with ETag for conditional GitHub API requests; separate from the archive-size limit.
+- `CACHE_DIR/archives/<id>/<asset name>`: downloaded ZIPs, verified before reuse, pruned by `cache_max_size`. `CACHE_DIR/api/<owner>__<repo>.json`: cached release list with ETag for conditional GitHub API requests; separate from the archive-size limit. `CACHE_DIR/shots/<source>/<app>/<key>.jpg`: launcher screenshots (at most the catalogue's pictures, about 4 MB).
 - `WORK_DIR/downloads/<asset name>.<random>.part`: in-progress downloads; interrupted temporary files are cleaned at startup. `WORK_DIR` and `CACHE_DIR` need not be on the data filesystem.
 - If `CRAFT_LOG_DIR` is set, `LOG_DIR/updater.log` supplements stderr; on exceeding `log_max_size` it rotates to `updater.log.1`, through `updater.log.<log_backups>` (or discards old logs if backups is zero). Enable the optional Compose mount with `compose.logs.yaml` to persist these logs.
 

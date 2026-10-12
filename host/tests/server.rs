@@ -733,9 +733,19 @@ fn signed_in_apps_need_a_role_and_admin_needs_the_admin_role() {
     assert_eq!(r.header("cache-control"), Some("no-store"));
     assert_eq!(get(&format!("{u}/testcraft/1.0.0/big.js"), &[]).status, 401);
     assert_eq!(get(&format!("{u}/status.json"), &[]).status, 401);
-    // Health, sign-in, the launcher's logos and fonts, and web app manifests (fetched without
-    // cookies) stay reachable; a missing manifest is 404, not 401.
-    for open in ["/healthz", "/auth/login", "/launcher/icons/photocraft.webp"] {
+    // Screenshots follow the apps' rule: they reveal which apps are enabled.
+    assert_eq!(
+        get(&format!("{u}/launcher/shots/photocraft/demo.jpg"), &[]).status,
+        401
+    );
+    // Health, sign-in, the launcher's logos, fonts and catalogue, and web app manifests (fetched
+    // without cookies) stay reachable; a missing manifest is 404, not 401.
+    for open in [
+        "/healthz",
+        "/auth/login",
+        "/launcher/icons/photocraft.webp",
+        "/launcher/catalog.json",
+    ] {
         assert_eq!(get(&format!("{u}{open}"), &[]).status, 200, "{open}");
     }
     let manifest = get(&format!("{u}/testcraft/1.0.0/app.webmanifest"), &[]);

@@ -157,14 +157,17 @@ fn is_navigation(headers: &HeaderMap) -> bool {
 }
 
 /// Paths that are never behind the apps gate: health, sign-in, the launcher's static files
-/// (logos, fonts), /admin, which checks for the admin role itself, and web app manifests, which
-/// browsers fetch without cookies (they describe the app: name, icons, colors, start URL).
+/// (logos, fonts, catalogue, translations), /admin, which checks for the admin role itself, and
+/// web app manifests, which browsers fetch without cookies (they describe the app: name, icons,
+/// colors, start URL). Screenshots are not static: they exist only for enabled apps and are
+/// fetched on demand, so they follow the apps' access rule.
 fn open_path(path: &str) -> bool {
     path == "/healthz"
         || path == "/admin"
-        || ["/readyz/", "/auth/", "/launcher/", "/admin/"]
+        || (["/readyz/", "/auth/", "/launcher/", "/admin/"]
             .iter()
             .any(|p| path.starts_with(p))
+            && !path.starts_with("/launcher/shots/"))
         || path.ends_with(".webmanifest")
 }
 
