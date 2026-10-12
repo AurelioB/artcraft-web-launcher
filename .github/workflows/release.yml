@@ -57,10 +57,10 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ghcr.io/aureliob/craft-host
-          flavor: latest=auto
+          # Shared tags (X.Y, latest) are promoted after the build, see below.
+          flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
           labels: |
             org.opencontainers.image.title=Craft Apps Host
@@ -77,6 +77,24 @@ jobs:
           build-args: VERSION=${{ steps.meta.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+      # Releases can finish out of order (two tags pushed close together). Point X.Y and latest
+      # at this version only if it is the newest of its minor series / of all releases, judged
+      # from the tags that exist now, after the long build.
+      - name: Promote X.Y and latest
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          git fetch --tags --force --quiet origin
+          this="${GITHUB_REF_NAME#v}"
+          case "$this" in *-*) echo "pre-release $this: shared tags unchanged"; exit 0 ;; esac
+          stable() { git tag -l "$1" | sed 's/^v//' | grep -v -- - | sort -V | tail -n1; }
+          minor="${this%.*}"
+          image=ghcr.io/aureliob/craft-host
+          tags=()
+          if [ "$this" = "$(stable "v$minor.*")" ]; then tags+=(-t "$image:$minor"); fi
+          if [ "$this" = "$(stable 'v*.*.*')" ]; then tags+=(-t "$image:latest"); fi
+          if [ ${#tags[@]} -eq 0 ]; then echo "$this is not the newest release: shared tags unchanged"; exit 0; fi
+          docker buildx imagetools create "${tags[@]}" "$image:$this"
+          echo "promoted $this: ${tags[*]}"
 
   binaries:
     needs: verify

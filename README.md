@@ -177,7 +177,7 @@ below are from `.env.example`; defaults shown in parentheses come from Compose.
 | `LOG_DIR` | Optional host log directory mounted at `/srv/logs` with the logs overlay. |
 | `COMPOSE_FILE` | Set to `compose.yaml:compose.logs.yaml` to enable persistent logs; otherwise just `compose.yaml`. |
 | `BIND_ADDRESS`, `PORT` | Published host-side HTTP address and port; default `0.0.0.0:8080`. |
-| `IMAGE` | Image to pull/run; default `ghcr.io/aureliob/craft-host:latest`, e.g. pin `ghcr.io/aureliob/craft-host:0.1.0`. |
+| `IMAGE` | Image to pull/run; default `ghcr.io/aureliob/craft-host:latest`, e.g. pin `ghcr.io/aureliob/craft-host:0.2.1`. |
 | `LOG_LEVEL` | Process log level passed as `CRAFT_LOG_LEVEL`; default `info`. |
 | `WORKING_DIR` | Container process working directory; default `/srv/work` (not the `WORK_DIR` host path). |
 
@@ -237,9 +237,10 @@ With Compose, pull a newer published image and restart:
 docker compose pull && docker compose up -d
 ```
 
-Set `IMAGE=ghcr.io/aureliob/craft-host:0.1.0` in `.env` to pin a release;
-change it when you choose to upgrade. A `vX.Y.Z` release publishes `X.Y.Z`,
-`X.Y` and `latest` image tags for `linux/amd64` and `linux/arm64`. Pushes to
+Set `IMAGE=ghcr.io/aureliob/craft-host:0.2.1` in `.env` to pin a release;
+change it when you choose to upgrade. A `vX.Y.Z` release publishes the `X.Y.Z`
+image tag for `linux/amd64` and `linux/arm64`, and moves `X.Y` and `latest` to it
+when it is the newest release of its minor series and of all releases. Pushes to
 `main` publish `edge` rather than `latest`. For a local build, pull source
 changes and run `docker compose build && docker compose up -d`; for a
 standalone install, replace the binary and restart your service. Keep backups
