@@ -217,17 +217,20 @@ pub(crate) fn agent(timeout_global: u64, connect: u64) -> ureq::Agent {
 /// seconds. `Ok(None)` for 404/410; any other non-200 answer, a larger body or a transport
 /// failure is an error. With `origin` (`scheme://host[:port]`), the URL and every redirect must
 /// stay on it (at most five redirects), so addresses read from a web page cannot lead elsewhere;
-/// without, redirects are followed (at most ten, ureq's default).
+/// without, redirects are followed (at most ten, ureq's default). Responses may come gzipped
+/// (the feed shrinks to a quarter); `max` bounds the decompressed bytes.
 pub(crate) fn fetch_public(
     url: &str,
     max: u64,
     timeout: u64,
     origin: Option<&str>,
 ) -> Result<Option<Vec<u8>>, String> {
+    const GZIP: (&str, &str) = ("Accept-Encoding", "gzip");
     let mut url = url.to_string();
     let mut resp = match origin {
         None => agent(timeout, timeout)
             .get(&url)
+            .header(GZIP.0, GZIP.1)
             .call()
             .map_err(|e| format!("{url}: {e}"))?,
         Some(origin) => {
@@ -244,7 +247,11 @@ pub(crate) fn fetch_public(
                 if !origin_of(&url).is_some_and(|o| o.eq_ignore_ascii_case(origin)) {
                     return Err(format!("{url}: not on {origin}"));
                 }
-                let resp = agent.get(&url).call().map_err(|e| format!("{url}: {e}"))?;
+                let resp = agent
+                    .get(&url)
+                    .header(GZIP.0, GZIP.1)
+                    .call()
+                    .map_err(|e| format!("{url}: {e}"))?;
                 if hops == 5 || !matches!(resp.status().as_u16(), 301 | 302 | 303 | 307 | 308) {
                     break resp;
                 }
@@ -266,9 +273,18 @@ pub(crate) fn fetch_public(
         404 | 410 => return Ok(None),
         code => return Err(format!("{url}: HTTP {code}")),
     }
+    let gzipped = resp
+        .headers()
+        .get(ureq::http::header::CONTENT_ENCODING)
+        .is_some_and(|v| v.as_bytes().eq_ignore_ascii_case(b"gzip"));
+    let body = resp.body_mut().as_reader();
+    let reader: Box<dyn Read + '_> = if gzipped {
+        Box::new(flate2::read::GzDecoder::new(body))
+    } else {
+        Box::new(body)
+    };
     let mut bytes = Vec::new();
-    resp.body_mut()
-        .as_reader()
+    reader
         .take(max + 1)
         .read_to_end(&mut bytes)
         .map_err(|e| format!("{url}: {e}"))?;

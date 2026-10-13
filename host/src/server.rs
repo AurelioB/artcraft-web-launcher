@@ -338,6 +338,10 @@ pub fn router(shared: Arc<Shared>) -> Router {
         .route("/admin/api/status", get(admin::api_status))
         .route("/admin/api/apps/{app}/{action}", post(admin::api_action))
         .route(
+            "/admin/api/discovery/refresh",
+            post(admin::api_refresh_discovery),
+        )
+        .route(
             "/admin/api/users",
             get(admin::users_list).post(admin::users_create),
         )

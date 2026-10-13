@@ -99,6 +99,30 @@ impl Shots {
             }
         }
     }
+
+    /// Drop the cached screenshots of these apps and their failed fetches, so the next view
+    /// fetches them again (after their page was read again).
+    pub fn forget(&self, cfg: &Config, app_ids: &[String]) {
+        self.failures
+            .lock()
+            .retain(|id, _| !app_ids.iter().any(|a| id.starts_with(&format!("{a}/"))));
+        let Ok(sources) = fs::read_dir(cfg.paths.cache.join("shots")) else {
+            return;
+        };
+        for source in sources.flatten() {
+            for app in app_ids {
+                let path = source.path().join(app);
+                if path.is_dir()
+                    && let Err(e) = fs::remove_dir_all(&path)
+                {
+                    log::warn!(
+                        "screenshots of {app}: cannot remove {}: {e}",
+                        path.display()
+                    );
+                }
+            }
+        }
+    }
 }
 
 /// Launcher URLs of a discovered app's screenshots (empty for other apps).

@@ -1746,6 +1746,7 @@ fn status_app(u: &str, id: &str) -> Option<serde_json::Value> {
 
 #[test]
 fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
+    use craft_host::discovery::Refresh;
     let gh = FakeGitHub::start();
     let g = &gh.url;
     // TestCraft is served at /clashcraft/, so a discovered "clashcraft" cannot be.
@@ -1753,8 +1754,12 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         &gh,
         r#"entry = "clashcraft""#,
         "min_free_space = 0",
-        &format!("[discovery]\nfeed_url = \"{g}/feed.json\"\nmetadata_url = \"{g}/apps\"\n"),
+        &format!(
+            "[discovery]\nfeed_url = \"{g}/feed.json\"\nmetadata_url = \"{g}/apps\"\n\
+             [auth]\nmethods = [\"local\"]\n[admin]\nenabled = true\n"
+        ),
     );
+    write_users(&e, &[("ana", "s3cret-pw", "admin")]);
     gh.put_route(
         "/feed.json",
         feed(&[
@@ -1784,6 +1789,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
 
     let s = start(&e);
     let u = &s.url;
+    let live = &s.shared.live;
     assert!(status_app(u, "newcraft").is_none());
     assert_eq!(
         get(&format!("{u}/launcher/discovered/newcraft.webp"), &[]).status,
@@ -1791,7 +1797,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     );
 
     // Found while running, before its page exists: listed under the feed's name, no logo yet.
-    craft_host::daemon::discover(&s.shared.live);
+    craft_host::daemon::discover(live, Refresh::Scheduled).unwrap();
     let app = status_app(u, "newcraft").expect("discovered app listed");
     assert_eq!(
         (&app["name"], &app["discovered"], &app["icon"]),
@@ -1804,10 +1810,23 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         (&"TestCraft".into(), &false.into())
     );
     assert!(status_app(u, "clashcraft").is_none());
-    assert_eq!(gh.hits("/apps/newcraft"), 1);
 
-    // The page appears: the next round reads it and the logo. Pictures stay on the site, also
-    // across redirects.
+    // The feed is read once per interval, across restarts: the next scheduled round asks
+    // nothing, and a restarted server would not read it for a day.
+    assert!(
+        craft_host::daemon::discover(live, Refresh::Scheduled)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!((gh.hits("/feed.json"), gh.hits("/apps/newcraft")), (1, 1));
+    let restarted = craft_host::config::load_config(e.cfg.paths.clone()).unwrap();
+    assert!(
+        craft_host::discovery::next_due(&restarted)
+            > craft_host::timeutil::now_epoch() + 86_400 - 60
+    );
+
+    // The page appears; an administrator's refresh reads it and the logo. Pictures stay on
+    // the site, also across redirects.
     let webp = b"RIFF\x10\0\0\0WEBPVP8 logo".to_vec();
     let png = b"\x89PNG\r\n\x1a\nscreenshot".to_vec();
     gh.put_route("/images/apps/newcraft/icon.webp", webp.clone());
@@ -1825,18 +1844,47 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         "/shots/away.png",
         redirect(format!("{}/elsewhere.png", elsewhere.url)),
     );
-    let page = format!(
-        r#"<html><head>
+    let page = |description: &str, logo: &str| {
+        format!(
+            r#"<html><head>
 <meta property="og:title" content="NewCraft: Draw &amp; paint."/>
 <meta property="og:description" content="A brand new app."/>
 <script type="application/ld+json">{{"@type":"SoftwareApplication","name":"NewCraft",
- "description":"Everything about NewCraft.","url":"{g}/apps/newcraft",
+ "description":"{description}","url":"{g}/apps/newcraft",{logo}
  "screenshot":["{g}/shots/one.png","{g}/shots/moved.png","{g}/shots/away.png","https://evil.example/x.png"],
  "sameAs":"https://github.com/storytold/newcraft"}}</script>
 </head></html>"#
+        )
+        .into_bytes()
+    };
+    gh.put_route("/apps/newcraft", page("Everything about NewCraft.", ""));
+    let refresh_url = format!("{u}/admin/api/discovery/refresh");
+    assert_eq!(request("POST", &refresh_url, &[], None).status, 401);
+    let ana = session_from(&form_login(u, "ana", "s3cret-pw", ""));
+    let (cookie, csrf) = admin_headers(u, &ana);
+    assert_eq!(
+        request("POST", &refresh_url, &[("Cookie", &cookie)], None).status,
+        403,
+        "no CSRF header"
     );
-    gh.put_route("/apps/newcraft", page.into_bytes());
-    craft_host::daemon::discover(&s.shared.live);
+    let h = [("Cookie", cookie.as_str()), ("X-Craft-CSRF", csrf.as_str())];
+    let refresh = || {
+        assert_eq!(request("POST", &refresh_url, &h, None).status, 202);
+        let st = wait_idle(u, &h);
+        st["results"][0].clone()
+    };
+    let done = refresh();
+    assert_eq!(
+        (&done["ok"], &done["message"]),
+        (
+            &true.into(),
+            &"feed read; new apps: none; pages read: newcraft".into()
+        ),
+        "{done}"
+    );
+    let st = json_body(&get(&format!("{u}/admin/api/status"), &h));
+    assert!(st["discovery"]["feed_read_at"].is_string(), "{st}");
+    assert_eq!(st["discovery"]["interval_secs"], 86_400);
     let app = status_app(u, "newcraft").unwrap();
     assert_eq!(app["name"], "NewCraft");
     assert_eq!(app["tagline"], "A brand new app.");
@@ -1858,15 +1906,18 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         (200, Some("image/webp"))
     );
     assert_eq!(logo.body, webp);
-    for shot in ["1.png", "2.png"] {
-        let r = get(&format!("{u}/launcher/shots/newcraft/{shot}"), &[]);
-        assert_eq!(
-            (r.status, r.header("content-type")),
-            (200, Some("image/png")),
-            "{shot}"
-        );
-        assert_eq!(r.body, png);
-    }
+    let shots = || {
+        for shot in ["1.png", "2.png"] {
+            let r = get(&format!("{u}/launcher/shots/newcraft/{shot}"), &[]);
+            assert_eq!(
+                (r.status, r.header("content-type")),
+                (200, Some("image/png")),
+                "{shot}"
+            );
+            assert_eq!(r.body, png);
+        }
+    };
+    shots();
     for missing in [
         "/launcher/shots/newcraft/3.png",
         "/launcher/shots/newcraft/4.png",
@@ -1883,12 +1934,58 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         "off-site redirect not followed"
     );
 
-    // Metadata is read once; a page still missing is asked for again, without re-announcing.
-    craft_host::daemon::discover(&s.shared.live);
+    // Pages, logos and screenshots are fetched once: further views, and scheduled rounds even
+    // when the feed is due again (here: last read long ago), ask the site nothing more.
+    let fetched = gh.hits("/shots/one.png");
+    let record = e.cfg.paths.state.join("discovered/apps.json");
+    let mut saved: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&record).unwrap()).unwrap();
+    saved["feed_read_at"] = "2026-01-01T00:00:00Z".into();
+    std::fs::write(&record, serde_json::to_vec(&saved).unwrap()).unwrap();
+    let round = craft_host::daemon::discover(live, Refresh::Scheduled)
+        .unwrap()
+        .expect("feed due");
+    assert_eq!((round.new.len(), round.pages.len()), (0, 0));
+    shots();
     assert_eq!(
-        (gh.hits("/apps/newcraft"), gh.hits("/apps/clashcraft")),
-        (2, 3)
+        (
+            gh.hits("/feed.json"),
+            gh.hits("/apps/newcraft"),
+            gh.hits("/images/apps/newcraft/icon.webp"),
+            gh.hits("/shots/one.png")
+        ),
+        (3, 2, 1, fetched)
     );
+
+    // The page changes: a refresh picks up its text and new logo (the old one goes) and
+    // fetches the screenshots again.
+    gh.put_route("/images/apps/newcraft/logo.png", png.clone());
+    gh.put_route(
+        "/apps/newcraft",
+        page(
+            "Now with layers.",
+            &format!(r#""thumbnailUrl":"{g}/images/apps/newcraft/logo.png","#),
+        ),
+    );
+    assert_eq!(refresh()["ok"], true);
+    let app = status_app(u, "newcraft").unwrap();
+    assert_eq!(
+        (&app["description"], &app["icon"]),
+        (
+            &"Now with layers.".into(),
+            &"launcher/discovered/newcraft.png".into()
+        )
+    );
+    assert_eq!(
+        get(&format!("{u}/launcher/discovered/newcraft.png"), &[]).body,
+        png
+    );
+    assert_eq!(
+        get(&format!("{u}/launcher/discovered/newcraft.webp"), &[]).status,
+        404
+    );
+    shots();
+    assert!(gh.hits("/shots/one.png") > fetched);
 
     // Installed through the normal update path, then served.
     let cfg = s.shared.cfg();
@@ -1902,7 +1999,8 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     assert_eq!(r.status, 200);
     assert!(r.text().contains("app.js"));
 
-    // A feed outage changes nothing.
+    // A refresh during a feed outage fails and changes nothing.
+    let read_at = craft_host::discovery::feed_read_at(&e.cfg.paths.state);
     gh.behave(
         "/feed.json",
         Behavior {
@@ -1910,8 +2008,16 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
             ..Behavior::default()
         },
     );
-    craft_host::daemon::discover(&s.shared.live);
-    assert_eq!(status_app(u, "newcraft").unwrap()["name"], "NewCraft");
+    let failed = refresh();
+    assert_eq!(failed["ok"], false, "{failed}");
+    assert_eq!(
+        status_app(u, "newcraft").unwrap()["description"],
+        "Now with layers."
+    );
+    assert_eq!(
+        craft_host::discovery::feed_read_at(&e.cfg.paths.state),
+        read_at
+    );
     gh.clear_behaviors();
 
     // A restart keeps discovered apps, still without the colliding one.
@@ -1920,7 +2026,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     assert!(app.discovered);
     assert_eq!(
         (app.name.as_str(), app.logo.as_deref()),
-        ("NewCraft", Some("newcraft.webp"))
+        ("NewCraft", Some("newcraft.png"))
     );
     assert!(restarted.app("clashcraft").is_err());
 
@@ -1930,7 +2036,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     std::fs::write(&e.cfg.paths.config_file, toml).unwrap();
     let defined = craft_host::config::load_config(e.cfg.paths.clone()).unwrap();
     let live = LiveConfig::new(defined);
-    craft_host::daemon::discover(&live);
+    craft_host::daemon::discover(&live, Refresh::Everything).unwrap();
     let app = live.get().app("newcraft").unwrap().clone();
     assert_eq!((app.name.as_str(), app.discovered), ("Mine", false));
     let saved = craft_host::discovery::load(&e.cfg.paths.state);

@@ -45,6 +45,9 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 .login a.sso:hover { border-color: var(--accent); }
 .section-title { display: flex; justify-content: space-between; align-items: center; margin: 28px 0 8px; }
 .section-title h2 { margin: 0; }
+.discovery { display: flex; align-items: center; gap: 12px; font-size: 0.9rem; }
+.discovery[hidden] { display: none; }
+.discovery .muted { margin: 0; }
 #users-note { margin: 0 0 8px; }
 dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--card); color: var(--fg); padding: 0; width: min(420px, 92vw); }
 dialog::backdrop { background: rgb(0 0 0 / 0.35); }

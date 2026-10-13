@@ -106,11 +106,13 @@ host = ""
 screenshots_url = "https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1"
 
 [discovery]
-# New Craft apps are found at run time in the ArtCraft release feed (at startup, then once per
-# check_interval) and installed like the built-in ones; their name, description, logo and
-# screenshots come from <metadata_url>/<id> on the ArtCraft site. "" turns either part off.
+# New Craft apps are found at run time in the ArtCraft release feed (read once per interval,
+# across restarts) and installed like the built-in ones; their name, description, logo and
+# screenshots come from <metadata_url>/<id> on the ArtCraft site, fetched once ("Refresh app
+# info" in /admin reads them again). "" turns either part off.
 feed_url = "https://api.storyteller.ai/v1/craft_apps/release_info"
 metadata_url = "https://getartcraft.com/apps"
+interval = "1d"                # at least 1h
 
 # Per-app settings. Built-in apps: photocraft, vectorcraft, filmcraft, lightcraft, pdfcraft,
 # effectcraft, designcraft, wordcraft, deckcraft, gridcraft, cadcraft, soundcraft, figcraft. All are

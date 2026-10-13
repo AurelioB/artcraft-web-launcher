@@ -26,9 +26,18 @@ then governs again). The other actions are refused for a disabled app. If the in
 follows Enable fails, the app stays enabled, shows the error and is retried on schedule like any
 other app.
 
+Next to the apps' heading, **Refresh app info** (shown while [app
+discovery](configuration.md#discovery) is on, with the time the ArtCraft feed was last read)
+reads the feed at once and every discovered app's page and logo again. It also drops their
+cached screenshots, which are fetched again when next viewed. Otherwise the feed is read once per
+`[discovery] interval` (daily by default) and each page, logo and screenshot only once. A page
+that cannot be read keeps what was known before. Built-in apps' names, logos and pages are part
+of `craft-host` and need no refresh.
+
 Actions run one at a time in the background, under the same lock as scheduled updates and the
-CLI, so disabling waits for a running update of that app to finish; the page shows the running
-action, recent results and the update history. Every action is recorded with the signed-in user.
+CLI (a refresh waits only for a scheduled discovery round), so disabling waits for a running
+update of that app to finish. The page shows the running action, recent results and the update
+history. Every action is recorded with the signed-in user.
 
 The interface is **disabled by default** (`/admin` answers 404). Enable it with a sign-in
 method and a first administrator:

@@ -188,3 +188,24 @@ Against local mirrors with the debug binary:
 
 The live feed currently lists no app that this version does not already include, so no real app
 has been discovered in production yet.
+
+## 0.3.1 (13 October 2026): fewer requests, refresh app info
+
+`cargo test` (unit 56, lifecycle 17, HTTP/admin 15): all passed, with `cargo clippy
+--all-targets -- -D warnings` clean. The discovery test now counts requests to the fake site. A
+second scheduled round within the interval sends none. A restarted configuration does not make
+the feed due. With the feed due again (last read backdated), a round reads only the feed: page,
+logo and screenshots stay at one request each, and further views are served from the cache.
+**Refresh app info** needs an administrator session (401 without, 403 without the CSRF token).
+It re-reads the page, picks up a changed description and a new PNG logo (the old WebP is
+removed and answers 404), and fetches screenshots again. During a feed outage it reports failure
+and changes neither the metadata nor the last-read time.
+
+With the debug binary against a local site that gzips whenever asked:
+
+- The feed (312 KB uncompressed), page and logo were requested with `Accept-Encoding: gzip`,
+  answered compressed and decoded; the app was discovered.
+- A restart six seconds later sent no request to the site.
+- In `/admin` (headless Chromium) the Apps heading showed "ArtCraft feed read <time>, daily".
+  Refresh app info ran as an admin action ("feed read; new apps: none; pages read: gzcraft")
+  and sent exactly the feed, page and logo requests.

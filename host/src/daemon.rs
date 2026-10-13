@@ -10,6 +10,7 @@ use parking_lot::Mutex;
 
 use crate::activity::Activity;
 use crate::config::{Config, LiveConfig};
+use crate::discovery::{Refresh, Refreshed};
 use crate::ops::{Outcome, Updater};
 use crate::server::{self, Shared};
 use crate::store::{AppState, Store};
@@ -19,6 +20,8 @@ use crate::timeutil::now_epoch;
 const MIN_RETRY_SECS: i64 = 30;
 /// How often pending releases are re-evaluated for idle activation.
 const ACTIVATION_TICK_SECS: i64 = 60;
+/// Delay before reading the ArtCraft feed again after a failed read.
+const DISCOVERY_RETRY_SECS: i64 = 3600;
 
 /// Run one update cycle. Scheduled cycles (`manual = false`) only check apps that are due (see
 /// [`due_at`]), so a retry for one app does not query GitHub again for all the others.
@@ -111,14 +114,17 @@ pub fn activate_idle(cfg: &Config, updater: &Updater) {
     }
 }
 
-/// Look for new apps in the ArtCraft feed; when the list of discovered apps changed, switch the
-/// running server to a configuration that includes them. Failures are logged and change
-/// nothing.
-pub fn discover(live: &LiveConfig) {
+/// Look for new apps in the ArtCraft feed and read their pages (see [`Refresh`]); when what is
+/// known about discovered apps changed, switch the running server to a configuration that
+/// includes it. `None` when discovery is off or not due. Failures are logged and change nothing.
+pub fn discover(live: &LiveConfig, what: Refresh) -> Result<Option<Refreshed>> {
     let cfg = live.get();
-    match crate::discovery::refresh(&cfg) {
-        Ok(Some(found)) => {
-            let next = cfg.with_discovered(&found);
+    let result = crate::discovery::refresh(&cfg, what);
+    match &result {
+        Ok(Some(Refreshed {
+            apps: Some(found), ..
+        })) => {
+            let next = cfg.with_discovered(found);
             let added: Vec<_> = next
                 .apps
                 .iter()
@@ -130,8 +136,22 @@ pub fn discover(live: &LiveConfig) {
             }
             live.replace(next);
         }
-        Ok(None) => {}
+        Ok(_) => {}
         Err(e) => log::warn!("app discovery: {e:#}"),
+    }
+    result
+}
+
+/// A scheduled discovery round; returns when the next one is due (an hour after a failure,
+/// never with discovery off).
+fn discovery_round(live: &LiveConfig) -> i64 {
+    if live.get().discovery.feed_url.is_none() {
+        return i64::MAX;
+    }
+    let now = now_epoch();
+    match discover(live, Refresh::Scheduled) {
+        Ok(_) => crate::discovery::next_due(&live.get()).max(now + 60),
+        Err(_) => now + DISCOVERY_RETRY_SECS,
     }
 }
 
@@ -158,10 +178,9 @@ fn updater_loop(live: Arc<LiveConfig>, activity: Arc<Activity>, phase: Arc<Mutex
         }
         Err(e) => log::warn!("{e:#}"),
     }
-    // One feed request per check interval at most; a discovered app is due at once.
-    discover(&live);
-    let discovery_interval = cfg.updater.check_interval_secs as i64;
-    let mut next_discovery = now_epoch() + discovery_interval;
+    // The feed is read once per [discovery] interval, across restarts; an app found is due at
+    // once.
+    let mut next_discovery = discovery_round(&live);
     let cfg = live.get();
     let mut next = first_run(&cfg, &Store::new(&cfg.paths.state));
     if next > now_epoch() {
@@ -174,8 +193,7 @@ fn updater_loop(live: Arc<LiveConfig>, activity: Arc<Activity>, phase: Arc<Mutex
     loop {
         let now = now_epoch();
         if now >= next_discovery {
-            discover(&live);
-            next_discovery = now + discovery_interval;
+            next_discovery = discovery_round(&live);
             next = next.min(next_run(&live.get(), &Store::new(&cfg.paths.state)));
         }
         // Each round works on the current configuration, including discovered apps.

@@ -136,6 +136,14 @@ async function load() {
   $("logout").hidden = !data.can_logout;
   $("running").hidden = !busy;
   $("running").textContent = busy ? `Running: ${data.running}` : "";
+  const discovery = data.discovery;
+  $("discovery").hidden = !discovery;
+  if (discovery) {
+    const days = discovery.interval_secs / 86400;
+    const every = Number.isInteger(days) ? (days === 1 ? "daily" : `every ${days} days`) : `every ${Math.round(discovery.interval_secs / 3600)} h`;
+    $("discovery-note").textContent = `ArtCraft feed read ${when(discovery.feed_read_at)}, ${every}`;
+    $("refresh-info").disabled = busy;
+  }
   // Disabled apps stay listed so they can be enabled again.
   document.querySelector("#apps tbody").replaceChildren(...data.status.apps.map(row));
   $("results").replaceChildren(
@@ -154,6 +162,20 @@ async function load() {
 $("logout").addEventListener("click", async () => {
   await fetch("../auth/logout", { method: "POST", credentials: "same-origin" });
   location.href = "./";
+});
+
+$("refresh-info").addEventListener("click", async () => {
+  $("error").hidden = true;
+  const res = await fetch("api/discovery/refresh", {
+    method: "POST",
+    credentials: "same-origin",
+    headers: { "X-Craft-CSRF": csrf() },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    showError(body.error || `HTTP ${res.status}`);
+  }
+  setTimeout(load, 500);
 });
 
 // ---- Users ----------------------------------------------------------------------------------

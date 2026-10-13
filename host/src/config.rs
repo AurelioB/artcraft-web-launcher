@@ -234,11 +234,14 @@ pub struct LauncherSettings {
     pub screenshots_url: Option<String>,
 }
 
-/// Where new apps are discovered, see [`crate::discovery`]; `None` turns that part off.
+/// Where and how often new apps are discovered, see [`crate::discovery`]; a `None` URL turns
+/// that part off.
 #[derive(Debug, Clone)]
 pub struct DiscoverySettings {
     pub feed_url: Option<String>,
     pub metadata_url: Option<String>,
+    /// Time between two reads of the feed, kept across restarts.
+    pub interval_secs: u64,
 }
 
 pub const DEFAULT_FEED_URL: &str = "https://api.storyteller.ai/v1/craft_apps/release_info";
@@ -391,6 +394,7 @@ struct RawLauncher {
 struct RawDiscovery {
     feed_url: Option<String>,
     metadata_url: Option<String>,
+    interval: Option<Quantity>,
 }
 
 #[derive(Deserialize, Default)]
@@ -1332,7 +1336,20 @@ fn optional_url(value: String, key: &str, problems: &mut Vec<String>) -> Option<
     (!url.is_empty()).then_some(url)
 }
 
+/// New apps appear a few times a month: one feed read a day is plenty and spares the source.
+const DEFAULT_DISCOVERY_INTERVAL: u64 = 86_400;
+const MIN_DISCOVERY_INTERVAL: u64 = 3600;
+
 fn build_discovery(raw: RawDiscovery, problems: &mut Vec<String>) -> DiscoverySettings {
+    let interval_secs = parse_duration(
+        raw.interval,
+        "[discovery] interval",
+        DEFAULT_DISCOVERY_INTERVAL,
+        problems,
+    );
+    if interval_secs < MIN_DISCOVERY_INTERVAL {
+        problems.push("[discovery] interval: must be at least 1h".into());
+    }
     DiscoverySettings {
         feed_url: optional_url(
             raw.feed_url.unwrap_or_else(|| DEFAULT_FEED_URL.into()),
@@ -1345,6 +1362,7 @@ fn build_discovery(raw: RawDiscovery, problems: &mut Vec<String>) -> DiscoverySe
             "[discovery] metadata_url",
             problems,
         ),
+        interval_secs,
     }
 }
 

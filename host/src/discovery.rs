@@ -10,12 +10,15 @@
 //! description. Only URLs on that site are used, and every download is bounded.
 //!
 //! Discovered apps are kept in `STATE_DIR/discovered/apps.json` (logos beside it), so they
-//! survive restarts; apps from the manifest or config.toml always take precedence.
+//! survive restarts; apps from the manifest or config.toml always take precedence. The feed is
+//! read once per `[discovery] interval` (the time of the last read is kept there too, so restarts
+//! cost no request), each page and logo once; an administrator's refresh reads them all again.
 
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -23,7 +26,7 @@ use serde_json::Value;
 use crate::config::{Config, valid_id};
 use crate::fsutil::{atomic_write, atomic_write_json, read_json};
 use crate::github::{fetch_public, origin_of};
-use crate::timeutil::now_iso;
+use crate::timeutil::{now_epoch, now_iso, parse_iso};
 
 /// GitHub owner of every Craft app; the feed's other entries are ignored.
 const OWNER: &str = "storytold";
@@ -61,13 +64,42 @@ pub struct Discovered {
     /// File name of the logo in the discovery directory.
     pub logo: Option<String>,
     pub discovered_at: String,
-    /// When the page was read; `None` until it was found (retried at every refresh).
+    /// When the page was last read; `None` until it was found (retried at every feed read).
     pub metadata_at: Option<String>,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
 struct Saved {
+    /// The last successful read of the feed.
+    feed_read_at: Option<String>,
     apps: Vec<Discovered>,
+}
+
+/// One refresh at a time: the scheduled round and an administrator's refresh both rewrite
+/// `apps.json` and the logos.
+static REFRESH: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
+
+/// What a refresh reads.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Refresh {
+    /// The feed if `[discovery] interval` has passed since its last read, and the pages of apps
+    /// whose page was never read.
+    Scheduled,
+    /// The feed now, and every discovered app's page and logo again.
+    Everything,
+}
+
+/// What a refresh did.
+#[derive(Debug, Default)]
+pub struct Refreshed {
+    /// Every discovered app, when the list or what is known about them changed (the caller
+    /// then rebuilds its configuration).
+    pub apps: Option<Vec<Discovered>>,
+    /// Apps first seen in this read of the feed.
+    pub new: Vec<String>,
+    /// Apps whose page was read.
+    pub pages: Vec<String>,
 }
 
 /// An entry of the feed that qualifies as a Craft app.
@@ -84,22 +116,30 @@ pub fn dir(state: &Path) -> PathBuf {
 /// The discovered apps saved earlier; an unreadable record is reported and ignored (the apps
 /// are found again by the next refresh).
 pub fn load(state: &Path) -> Vec<Discovered> {
+    load_saved(state).apps
+}
+
+fn load_saved(state: &Path) -> Saved {
     match read_json::<Saved>(&dir(state).join("apps.json")) {
-        Ok(saved) => saved.map(|s| s.apps).unwrap_or_default(),
+        Ok(saved) => saved.unwrap_or_default(),
         Err(e) => {
             log::warn!("discovered apps: {e:#}");
-            Vec::new()
+            Saved::default()
         }
     }
 }
 
-fn save(state: &Path, apps: &[Discovered]) -> Result<()> {
-    atomic_write_json(
-        &dir(state).join("apps.json"),
-        &Saved {
-            apps: apps.to_vec(),
-        },
-    )
+/// When the feed was last read successfully.
+pub fn feed_read_at(state: &Path) -> Option<String> {
+    load_saved(state).feed_read_at
+}
+
+/// When the feed is due again: `[discovery] interval` after its last read, at once if never.
+pub fn next_due(cfg: &Config) -> i64 {
+    feed_read_at(&cfg.paths.state)
+        .as_deref()
+        .and_then(parse_iso)
+        .map_or_else(now_epoch, |t| t + cfg.discovery.interval_secs as i64)
 }
 
 /// The feed's Craft apps: entries whose repository is `storytold/<id>` and whose latest release
@@ -278,34 +318,47 @@ pub fn picture_kind(bytes: &[u8]) -> Option<&'static str> {
     }
 }
 
-/// Ask the feed for new apps and fill in missing page metadata. Returns the full list of
-/// discovered apps when it changed (the caller then rebuilds its configuration), `None` when
-/// nothing changed or discovery is off. Network failures leave everything as it was.
-pub fn refresh(cfg: &Config) -> Result<Option<Vec<Discovered>>> {
+/// Read the feed for new apps and the pages of discovered apps (see [`Refresh`]). `None` when
+/// discovery is off or the feed is not due. A failed feed read changes nothing; a page or logo
+/// that cannot be read keeps what was known before.
+pub fn refresh(cfg: &Config, what: Refresh) -> Result<Option<Refreshed>> {
     let Some(feed_url) = cfg.discovery.feed_url.as_deref() else {
         return Ok(None);
     };
-    let timeout = cfg.updater.http_timeout_secs;
+    let _one = REFRESH.lock();
     let state = &cfg.paths.state;
-    let mut apps = load(state);
-    let mut changed = false;
-    // Apps that became built in or were defined in config.toml are no longer "discovered". The
-    // ones left out of the configuration for colliding with another app stay recorded.
-    let before = apps.len();
-    apps.retain(|d| !cfg.apps.iter().any(|a| a.id == d.id && !a.discovered));
-    changed |= apps.len() != before;
-
+    let mut saved = load_saved(state);
+    let interval = cfg.discovery.interval_secs as i64;
+    if what == Refresh::Scheduled
+        && saved
+            .feed_read_at
+            .as_deref()
+            .and_then(parse_iso)
+            .is_some_and(|t| now_epoch() < t + interval)
+    {
+        return Ok(None);
+    }
+    let timeout = cfg.updater.http_timeout_secs;
     let feed = match fetch_public(feed_url, MAX_FEED, timeout, None) {
         Ok(Some(bytes)) => serde_json::from_slice::<Value>(&bytes)
             .map_err(|e| anyhow::anyhow!("{feed_url}: not JSON: {e}"))?,
         Ok(None) => anyhow::bail!("{feed_url}: not found"),
         Err(e) => anyhow::bail!(e),
     };
+    saved.feed_read_at = Some(now_iso());
+    let mut report = Refreshed::default();
+    let apps = &mut saved.apps;
+    // Apps that became built in or were defined in config.toml are no longer "discovered". The
+    // ones left out of the configuration for colliding with another app stay recorded.
+    let before = apps.len();
+    apps.retain(|d| !cfg.apps.iter().any(|a| a.id == d.id && !a.discovered));
+    let mut changed = apps.len() != before;
     for app in parse_feed(&feed) {
         if cfg.apps.iter().any(|a| a.id == app.id) || apps.iter().any(|d| d.id == app.id) {
             continue;
         }
         log::info!("{}: discovered in the ArtCraft feed", app.id);
+        report.new.push(app.id.clone());
         apps.push(Discovered {
             repository: format!("{OWNER}/{}", app.id),
             id: app.id,
@@ -315,61 +368,88 @@ pub fn refresh(cfg: &Config) -> Result<Option<Vec<Discovered>>> {
         });
         changed = true;
     }
-
     if let Some(base) = cfg.discovery.metadata_url.as_deref() {
         let origin = origin_of(base).unwrap_or_default();
-        for app in apps.iter_mut().filter(|d| d.metadata_at.is_none()) {
-            let page_url = format!("{base}/{}", app.id);
-            let html = match fetch_public(&page_url, MAX_PAGE, timeout, Some(&origin)) {
-                Ok(Some(bytes)) => String::from_utf8_lossy(&bytes).into_owned(),
-                Ok(None) => {
-                    log::info!("{}: no page at {page_url} yet", app.id);
-                    continue;
-                }
-                Err(e) => {
-                    log::warn!("{}: {e}", app.id);
-                    continue;
-                }
-            };
-            let meta = parse_page(&html, &app.id, &page_url, &origin);
-            if !meta.name.is_empty() {
-                app.name = meta.name;
+        for app in apps
+            .iter_mut()
+            .filter(|d| what == Refresh::Everything || d.metadata_at.is_none())
+        {
+            if read_page(app, base, &origin, timeout, state)? {
+                report.pages.push(app.id.clone());
+                changed = true;
             }
-            app.tagline = meta.tagline;
-            app.headline = meta.headline;
-            app.description = meta.description;
-            app.screenshots = meta.screenshots;
-            app.website = page_url;
-            // The site's naming convention when the page names no logo.
-            let logo_url = meta
-                .logo
-                .unwrap_or_else(|| format!("{origin}/images/apps/{}/icon.webp", app.id));
-            match fetch_public(&logo_url, MAX_LOGO, timeout, Some(&origin)) {
-                Ok(Some(bytes)) => match picture_kind(&bytes) {
-                    Some(ext) => {
-                        let file = format!("{}.{ext}", app.id);
-                        atomic_write(&dir(state).join(&file), &bytes)?;
-                        app.logo = Some(file);
-                    }
-                    None => log::warn!("{}: {logo_url} is not a picture", app.id),
-                },
-                Ok(None) => log::info!("{}: no logo at {logo_url}", app.id),
-                Err(e) => {
-                    // Keep the page's text; the next refresh reads the page and logo again.
-                    log::warn!("{}: {e}", app.id);
-                    changed = true;
-                    continue;
-                }
-            }
-            app.metadata_at = Some(now_iso());
-            changed = true;
         }
     }
-    if !changed {
-        return Ok(None);
+    // Saved even when nothing changed: the time of this read schedules the next one.
+    atomic_write_json(&dir(state).join("apps.json"), &saved)?;
+    report.apps = changed.then_some(saved.apps);
+    Ok(Some(report))
+}
+
+/// Read an app's page and logo into `app`; `false` when the page could not be read (nothing
+/// changes then). A logo that fails to download keeps the previous one and leaves
+/// `metadata_at` as it was, so a scheduled refresh tries again.
+fn read_page(
+    app: &mut Discovered,
+    base: &str,
+    origin: &str,
+    timeout: u64,
+    state: &Path,
+) -> Result<bool> {
+    let page_url = format!("{base}/{}", app.id);
+    let html = match fetch_public(&page_url, MAX_PAGE, timeout, Some(origin)) {
+        Ok(Some(bytes)) => String::from_utf8_lossy(&bytes).into_owned(),
+        Ok(None) => {
+            log::info!("{}: no page at {page_url} yet", app.id);
+            return Ok(false);
+        }
+        Err(e) => {
+            log::warn!("{}: {e}", app.id);
+            return Ok(false);
+        }
+    };
+    let meta = parse_page(&html, &app.id, &page_url, origin);
+    if !meta.name.is_empty() {
+        app.name = meta.name;
     }
-    save(state, &apps)?;
-    Ok(Some(apps))
+    app.tagline = meta.tagline;
+    app.headline = meta.headline;
+    app.description = meta.description;
+    app.screenshots = meta.screenshots;
+    app.website = page_url;
+    // The site's naming convention when the page names no logo.
+    let logo_url = meta
+        .logo
+        .unwrap_or_else(|| format!("{origin}/images/apps/{}/icon.webp", app.id));
+    let remove = |file: &str| {
+        let _ = std::fs::remove_file(dir(state).join(file));
+    };
+    match fetch_public(&logo_url, MAX_LOGO, timeout, Some(origin)) {
+        Ok(Some(bytes)) => match picture_kind(&bytes) {
+            Some(ext) => {
+                let file = format!("{}.{ext}", app.id);
+                atomic_write(&dir(state).join(&file), &bytes)?;
+                if let Some(old) = app.logo.replace(file.clone())
+                    && old != file
+                {
+                    remove(&old);
+                }
+            }
+            None => log::warn!("{}: {logo_url} is not a picture", app.id),
+        },
+        Ok(None) => {
+            log::info!("{}: no logo at {logo_url}", app.id);
+            if let Some(old) = app.logo.take() {
+                remove(&old);
+            }
+        }
+        Err(e) => {
+            log::warn!("{}: {e}", app.id);
+            return Ok(true);
+        }
+    }
+    app.metadata_at = Some(now_iso());
+    Ok(true)
 }
 
 #[cfg(test)]

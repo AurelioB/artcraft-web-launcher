@@ -369,6 +369,14 @@ struct AdminStatus {
     results: Vec<JobResult>,
     history: Vec<HistoryEntry>,
     status: status::Status,
+    /// `None` with app discovery off.
+    discovery: Option<DiscoveryStatus>,
+}
+
+#[derive(Serialize)]
+struct DiscoveryStatus {
+    feed_read_at: Option<String>,
+    interval_secs: u64,
 }
 
 pub async fn api_status(
@@ -393,6 +401,10 @@ pub async fn api_status(
             results: shared.jobs.results.lock().iter().cloned().collect(),
             history: store.history(None, 40),
             status: status::build(&cfg, &store, false),
+            discovery: cfg.discovery.feed_url.is_some().then(|| DiscoveryStatus {
+                feed_read_at: crate::discovery::feed_read_at(&cfg.paths.state),
+                interval_secs: cfg.discovery.interval_secs,
+            }),
         }
     })
     .await;
@@ -448,33 +460,47 @@ pub async fn api_action(
     if matches!(action.as_str(), "pin" | "allow") && version.is_none() {
         return json_error(StatusCode::BAD_REQUEST, "this action needs a version");
     }
-    {
-        let mut running = s.jobs.running.lock();
-        if let Some(r) = running.as_ref() {
-            return json_error(StatusCode::CONFLICT, &format!("busy: {r}"));
-        }
-        *running = Some(format!("{action} {app_id}"));
-    }
     log::info!(
         "admin: {} requested {action} {app_id} {}",
         principal.user,
         version.as_deref().unwrap_or("")
     );
+    start_job(
+        &s,
+        principal.user,
+        app_id,
+        action,
+        move |shared, user, app_id, action| {
+            run_action(shared, app_id, action, version.as_deref(), user)
+        },
+    )
+}
+
+/// Run `job` in the background as the only admin job, recording its result for the status.
+/// 409 while another job runs.
+fn start_job(
+    s: &Arc<Shared>,
+    user: String,
+    app: String,
+    action: String,
+    job: impl FnOnce(&Shared, &str, &str, &str) -> (bool, String) + Send + 'static,
+) -> Response<Body> {
+    {
+        let mut running = s.jobs.running.lock();
+        if let Some(r) = running.as_ref() {
+            return json_error(StatusCode::CONFLICT, &format!("busy: {r}"));
+        }
+        *running = Some(format!("{action} {app}"));
+    }
     let shared = s.clone();
     std::thread::spawn(move || {
-        let (ok, message) = run_action(
-            &shared,
-            &app_id,
-            &action,
-            version.as_deref(),
-            &principal.user,
-        );
+        let (ok, message) = job(&shared, &user, &app, &action);
         let mut results = shared.jobs.results.lock();
         results.push_front(JobResult {
             at: now_iso(),
-            app: app_id,
+            app,
             action,
-            user: principal.user,
+            user,
             ok,
             message,
         });
@@ -484,6 +510,59 @@ pub async fn api_action(
     let mut res = json_error(StatusCode::ACCEPTED, "started");
     *res.body_mut() = Body::from(r#"{"started":true}"#);
     res
+}
+
+/// `POST /admin/api/discovery/refresh`: read the ArtCraft feed now and every discovered app's
+/// page and logo again, and drop their cached screenshots.
+pub async fn api_refresh_discovery(
+    State(s): State<Arc<Shared>>,
+    ConnectInfo(peer): ConnectInfo<SocketAddr>,
+    headers: HeaderMap,
+) -> Response<Body> {
+    let c = ctx(&s, &headers, peer);
+    let principal = match authorize(&s, &headers, &c) {
+        Ok(p) => p,
+        Err(d) => return denied_api(d),
+    };
+    if !csrf_ok(&headers, c.host.as_deref()) {
+        return json_error(StatusCode::FORBIDDEN, "missing or invalid CSRF token");
+    }
+    if s.cfg().discovery.feed_url.is_none() {
+        return json_error(
+            StatusCode::CONFLICT,
+            "app discovery is turned off ([discovery] feed_url)",
+        );
+    }
+    log::info!("admin: {} requested a refresh of app info", principal.user);
+    start_job(
+        &s,
+        principal.user,
+        "app info".into(),
+        "refresh".into(),
+        |shared, _, _, _| refresh_app_info(shared),
+    )
+}
+
+fn refresh_app_info(s: &Shared) -> (bool, String) {
+    match crate::daemon::discover(&s.live, crate::discovery::Refresh::Everything) {
+        Ok(Some(r)) => {
+            s.shots.forget(&s.cfg(), &r.pages);
+            let list = |ids: &[String]| match ids {
+                [] => "none".to_string(),
+                ids => ids.join(", "),
+            };
+            (
+                true,
+                format!(
+                    "feed read; new apps: {}; pages read: {}",
+                    list(&r.new),
+                    list(&r.pages)
+                ),
+            )
+        }
+        Ok(None) => (false, "app discovery is turned off".into()),
+        Err(e) => (false, format!("{e:#}")),
+    }
 }
 
 fn run_action(

@@ -141,11 +141,13 @@ app in `/admin` (takes effect at once, survives restarts and takes precedence ov
 stop; releases and state stay on disk.
 
 A Craft app published after this version of `craft-host` is discovered at run time: the server
-reads the ArtCraft release feed at startup and once per `check_interval`, then installs the new
-app like the built-in ones and shows it in the launcher with the name, description, logo and
-screenshots of its page on getartcraft.com. The log reports `<id>: discovered in the ArtCraft
-feed`; disable it in `/admin` if it is not wanted. See
-[`[discovery]`](configuration.md#discovery) for the rules and for turning it off.
+reads the ArtCraft release feed once a day (`[discovery] interval`, kept across restarts), then
+installs the new app like the built-in ones and shows it in the launcher with the name,
+description, logo and screenshots of its page on getartcraft.com, each fetched once. The log
+reports `<id>: discovered in the ArtCraft feed`; disable it in `/admin` if it is not wanted.
+**Refresh app info** in `/admin` reads the feed at once and the discovered apps' pages, logos and
+screenshots again. See [`[discovery]`](configuration.md#discovery) for the rules and for turning
+it off.
 
 Any other app, or a Craft app while discovery is off, is defined in `config.toml`. A Craft app
 follows the suite's conventions, so it needs only its name:
