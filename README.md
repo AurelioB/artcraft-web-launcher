@@ -108,6 +108,53 @@ The image defaults to `serve` and port 8080. To keep rotated log files as well a
 container logs, mount a writable log directory at `/srv/logs` and set
 `CRAFT_LOG_DIR=/srv/logs` (Compose uses `compose.logs.yaml` for this).
 
+### On Unraid
+
+Unraid manages containers from its own Docker page instead of Compose. Prepare the
+five appdata directories once in the Unraid terminal (Tools → Terminal, or SSH) for
+the `nobody`/`users` identity (99:100) that the container runs as:
+
+```sh
+BASE=/mnt/user/appdata/craft-host
+mkdir -p "$BASE"/{config,data,state,cache,work}
+if [ ! -f "$BASE/config/config.toml" ]; then
+  curl -fsSL -o "$BASE/config/config.toml" \
+    https://raw.githubusercontent.com/AurelioB/craft-server/main/config.example.toml
+fi
+chown -R 99:100 "$BASE"
+chmod 2775 "$BASE"/{config,data,state,cache,work}
+chmod 0640 "$BASE/config/config.toml"
+```
+
+Put [`unraid/craft-host.xml`](unraid/craft-host.xml) in the user templates on the
+flash drive:
+
+```sh
+curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-craft-host.xml \
+  https://raw.githubusercontent.com/AurelioB/craft-server/main/unraid/craft-host.xml
+```
+
+Then open **Docker → Add Container**, choose `craft-host` under **User templates**,
+check the five host paths (and the matching `CRAFT_HOST_*` variables under
+**Show more settings** if you changed them) and press **Apply**. Unraid pulls
+`ghcr.io/aureliob/craft-host:latest` and starts it; the launcher is at
+`http://<unraid-ip>:8080/`. The template applies the same identity, read-only
+`/config`, `--read-only`, `--cap-drop=ALL` and `no-new-privileges` settings as the
+Compose file.
+
+The image has no shell: run `craft-host` commands with `docker exec` and read output
+with `docker logs craft-host` (or the log icon on the Docker page). For example, to
+check permissions, space and connectivity, and to add the first administrator after
+enabling `/admin/` in `config.toml` (see above) and restarting the container:
+
+```sh
+docker exec craft-host craft-host doctor
+docker exec -i craft-host craft-host user add NAME --role admin <<<'a long passphrase'
+```
+
+Configuration, sign-in, `/admin` and HTTPS work as with Compose; see
+[installation](docs/install.md) and the [configuration reference](docs/configuration.md).
+
 ### Without Docker
 
 Download a static Linux musl archive for your architecture from
