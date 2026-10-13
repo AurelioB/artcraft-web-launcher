@@ -159,6 +159,49 @@ WantedBy=multi-user.target
 The environment file contains the assignments above without `export`.
 See [installation](docs/install.md) for permissions and HTTPS.
 
+### On Unraid
+
+Unraid manages containers from its own Docker page instead of Compose. Prepare the
+five appdata directories once in the Unraid terminal (Tools → Terminal, or SSH) as
+the `nobody`/`users` identity (99:100) that the container runs as:
+
+```sh
+BASE=/mnt/user/appdata/craft-host
+
+mkdir -p "$BASE"/{config,data,state,cache,work}
+
+if [ ! -f "$BASE/config/config.toml" ]; then
+  curl -fsSL \
+    https://raw.githubusercontent.com/AurelioB/craft-server/main/config.example.toml \
+    -o "$BASE/config/config.toml"
+fi
+
+chown -R 99:100 "$BASE"
+chmod 2775 "$BASE"/{config,data,state,cache,work}
+chmod 640 "$BASE/config/config.toml"
+```
+
+Copy [`unraid/craft-host.xml`](unraid/craft-host.xml) to the user templates on the
+Unraid flash drive, or download it there directly:
+
+```sh
+curl -fsSL -o /boot/config/plugins/dockerMan/templates-user/my-craft-host.xml \
+  https://raw.githubusercontent.com/AurelioB/craft-server/main/unraid/craft-host.xml
+```
+
+Then open **Docker → Add Container**, choose `craft-host` under **User templates**
+in the **Template** dropdown, check the five host paths and press **Apply**;
+Unraid pulls `ghcr.io/aureliob/craft-host:latest` and starts the container. The
+launcher is at `http://<unraid-ip>:8080/` and the container's log is in the Docker
+page. The template carries the identity, the read-only `/config` mount and the
+`--read-only`, `--cap-drop=ALL` and `no-new-privileges` settings of the Compose
+file; `docker exec craft-host /usr/local/bin/craft-host doctor` checks permissions,
+space and connectivity. The image is distroless and has no shell, so run
+`craft-host` subcommands through `docker exec` and read `docker logs craft-host`
+for output. Configuration, sign-in, `/admin` and HTTPS are the same as for Compose;
+see [installation](docs/install.md) and the
+[configuration reference](docs/configuration.md).
+
 ## Configuration
 
 Compose reads `.env` for *host-side* paths and container settings. Sample values
