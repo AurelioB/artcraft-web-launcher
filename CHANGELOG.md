@@ -3,6 +3,23 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.1] - 2026-10-13
+
+### Added
+
+- **Refresh app info** in `/admin` reads the ArtCraft feed at once and every discovered app's
+  page and logo again, and drops their cached screenshots. The page shows when the feed was
+  last read.
+- `[discovery] interval` (default `"1d"`, at least `"1h"`).
+
+### Changed
+
+- The ArtCraft feed is read once a day instead of once per `check_interval` (hourly), and the
+  time of the last read is kept, so restarts no longer read it again; a failed read is retried
+  an hour later. Pages, logos and screenshots were already fetched only once.
+- The feed, app pages and pictures are requested gzipped (the feed shrinks from 384 KB to
+  about 95 KB); size limits apply to the decompressed data.
+
 ## [0.3.0] - 2026-10-13
 
 ### Added
@@ -112,6 +129,7 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.3.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.3.1
 [0.3.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.3.0
 [0.2.4]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.4
 [0.2.3]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.3
