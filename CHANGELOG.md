@@ -3,6 +3,12 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.2.3] - 2026-10-13
+
+### Changed
+
+- The launcher's Open button is outlined, as in ArtCraft Launcher, instead of filled.
+
 ## [0.2.2] - 2026-10-12
 
 ### Changed
@@ -80,6 +86,7 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.2.3]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.3
 [0.2.2]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.2
 [0.2.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.1
 [0.2.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.0

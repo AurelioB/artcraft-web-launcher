@@ -115,7 +115,7 @@ summary:focus-visible {
 }
 .hud-label,
 .segments button,
-.primary,
+.open,
 .menu summary,
 .card-links,
 .status-pill {
@@ -386,26 +386,27 @@ input[type="search"] {
   gap: 8px;
   margin-top: auto;
 }
-.primary {
+/* Open: outlined, as in ArtCraft Launcher (filled buttons there are for installs and updates). */
+.open {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 36px;
-  border: 1px solid var(--ink);
-  background: var(--ink);
-  color: var(--bg);
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--ink);
   text-decoration: none;
   font-weight: 700;
   letter-spacing: 0.15em;
   padding: 8px 16px;
   flex: 1;
 }
-.primary:hover {
-  background: var(--ink);
-  opacity: 0.85;
+.open:hover {
+  background: var(--sunken);
+  border-color: var(--ink);
   text-decoration: none;
 }
-.primary.disabled {
+.open.disabled {
   border-color: var(--line);
   background: transparent;
   color: var(--faint);
@@ -639,7 +640,7 @@ input[type="search"] {
   align-items: center;
   gap: 20px;
 }
-.detail-actions .primary {
+.detail-actions .open {
   flex: none;
   min-width: 180px;
 }

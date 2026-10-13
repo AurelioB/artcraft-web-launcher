@@ -116,8 +116,8 @@ function statusBadge(app) {
 }
 function openButton(app) {
   const href = app.state === "ready" ? safeURL(app.url) : null;
-  if (href) return el("a", { class: "primary", href }, t("Open"));
-  return el("span", { class: "primary disabled", "aria-disabled": "true" }, t("Open"));
+  if (href) return el("a", { class: "open", href }, t("Open"));
+  return el("span", { class: "open disabled", "aria-disabled": "true" }, t("Open"));
 }
 function appLinks(app, releaseNotes = true) {
   const links = [];
