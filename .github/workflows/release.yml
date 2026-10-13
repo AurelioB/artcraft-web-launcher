@@ -84,6 +84,15 @@ jobs:
           outputs: type=image,name=ghcr.io/aureliob/craft-host,push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=image-${{ matrix.platform }}
           cache-to: type=gha,scope=image-${{ matrix.platform }},mode=max
+      # The runner's own architecture: the image must start and report the crate version.
+      - name: Run the pushed image
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          out=$(docker run --rm "ghcr.io/aureliob/craft-host@$DIGEST" --version)
+          echo "$out"
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' host/Cargo.toml | head -n1)
+          test "$out" = "craft-host $crate"
       - name: Record digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -178,6 +187,13 @@ jobs:
           docker buildx build --platform "$PLATFORM" --target binary \
             --build-arg "VERSION=${VERSION#v}" \
             --output "type=local,dest=$RUNNER_TEMP/export" ./host
+      - name: Run the binary
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          out=$("$RUNNER_TEMP/export/craft-host" --version)
+          echo "$out"
+          test "$out" = "craft-host ${VERSION#v}"
       - name: Package binary
         env:
           ARCH: ${{ matrix.arch }}
