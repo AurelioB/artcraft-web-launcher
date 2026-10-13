@@ -103,6 +103,10 @@ const LAUNCHER: &[(&str, Asset)] = &[
         asset!("icons/soundcraft.webp", "image/webp"),
     ),
     (
+        "icons/figcraft.webp",
+        asset!("icons/figcraft.webp", "image/webp"),
+    ),
+    (
         "catalog.json",
         asset!("vendor/craft-launcher/catalog.json", "application/json"),
     ),

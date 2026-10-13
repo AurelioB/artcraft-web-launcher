@@ -1,7 +1,7 @@
 {
   "source": {
     "repository": "storytold/craft-launcher",
-    "commit": "1aaf7b27be2dba970d1a77f96aef6aad52352730",
+    "commit": "cbae640688c5fa3daa120a7f5e050f8e24148a47",
     "screenshots_base": "https://raw.githubusercontent.com/storytold/craft-launcher-assets",
     "screenshots_rev": "v1"
   },
@@ -719,6 +719,52 @@
             "caption": "The Score Editor"
           }
         ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "figcraft",
+      "name": "FigCraft",
+      "tagline": "Interface design and prototyping",
+      "group": "new",
+      "color": "#02da96",
+      "ink_light": "#047a56",
+      "ink_dark": "#4fe8b6",
+      "repository": "storytold/figcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/figcraft",
+      "details": {
+        "headline": "Interface design and prototyping, in pure Rust.",
+        "about": [
+          "Design screens, components and prototypes in a native app that opens instantly and works offline, with no account and no telemetry. Early alpha."
+        ],
+        "features": [
+          {
+            "title": "Auto layout",
+            "text": "Rows, columns, wrap and grids with padding, gaps and Hug, Fill or Fixed sizing, plus constraints and layout grids."
+          },
+          {
+            "title": "Components",
+            "text": "Instances with overrides, variants and properties, styles, and variables with modes bound to fills, strokes and effects."
+          },
+          {
+            "title": "Vectors",
+            "text": "Real vector networks, the pen and pencil, the shape builder, editable booleans and variable width strokes."
+          },
+          {
+            "title": "Prototypes",
+            "text": "Connections, triggers and animated transitions, variables with conditionals, flows and a presentation view with device frames."
+          },
+          {
+            "title": "Hand off",
+            "text": "Inspect mode with measurements, annotations, ready-for-dev status, and code for CSS, HTML, React, SwiftUI and Compose."
+          },
+          {
+            "title": "Your files",
+            "text": "Plain .figcraft files on your own disk. SVG, PNG, JPEG, WebP and PDF in and out, and .fig files open, best effort."
+          }
+        ],
+        "shots": [],
         "platforms": "macOS, Windows, Linux, FreeBSD, web"
       }
     }

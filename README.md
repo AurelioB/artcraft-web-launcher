@@ -1,8 +1,8 @@
 # Craft Apps Host
 
-Run the twelve official Craft browser apps on your own server: PhotoCraft, VectorCraft,
-FilmCraft, LightCraft, PdfCraft, EffectCraft, DesignCraft, WordCraft, DeckCraft, GridCraft,
-CADCraft and SoundCraft. A launcher at `/`, styled after the official ArtCraft Launcher, lists
+Run the official Craft browser apps on your own server: PhotoCraft, VectorCraft, FilmCraft,
+LightCraft, PdfCraft, EffectCraft, DesignCraft, WordCraft, DeckCraft, GridCraft, CADCraft,
+SoundCraft and FigCraft. A launcher at `/`, styled after the official ArtCraft Launcher, lists
 them in a grid or table with app pages and the launcher's translations. `craft-host`
 downloads official GitHub releases and checks for updates in the background; app updates do
 not require a new container image. Optional sign-in provides `user` and `admin` roles and an

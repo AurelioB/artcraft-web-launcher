@@ -1260,10 +1260,11 @@ mod tests {
                 "deckcraft",
                 "gridcraft",
                 "cadcraft",
-                "soundcraft"
+                "soundcraft",
+                "figcraft"
             ]
         );
-        assert_eq!(cfg.enabled_apps().count(), 12);
+        assert_eq!(cfg.enabled_apps().count(), 13);
         let pdf = cfg.app("pdfcraft").unwrap();
         assert_eq!(pdf.repository, "storytold/pdfcraft");
         assert_eq!(

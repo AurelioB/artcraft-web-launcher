@@ -1654,11 +1654,8 @@ fn launcher_data_release_icons_and_cached_screenshots() {
         )
     );
     assert_eq!(
-        json_body(&get(&format!("{u}/launcher/catalog.json"), &[]))["apps"]
-            .as_array()
-            .unwrap()
-            .len(),
-        12
+        get(&format!("{u}/launcher/catalog.json"), &[]).text(),
+        craft_host::catalog::CATALOG_JSON
     );
     let de = get(&format!("{u}/launcher/i18n/de.tsv"), &[]);
     assert!(

@@ -8,7 +8,7 @@
   (`release-assets.githubusercontent.com` as of October 2026) for updates. Installed apps keep
   being served without it.
 - An HTTPS reverse proxy for anything other than `localhost` (see [HTTPS](#https-and-the-reverse-proxy)).
-- Disk: one release of each of the twelve apps took about 730 MB in `DATA_DIR`, of which about
+- Disk: one release of each of the first twelve apps took about 730 MB in `DATA_DIR`, of which about
   300 MB are `.br`/`.gz` copies (written at install time, or shipped by LightCraft). The
   downloaded archives take about 250 MB in `CACHE_DIR` (12 October 2026 releases; LightCraft's
   alone is 100 MB). `keep_latest` can retain more releases per app; the archive cache is bounded
@@ -48,8 +48,8 @@ sudo install -m 0640 -o "$RUN_UID" -g "$RUN_GID" config.example.toml /srv/craft-
 ```
 
 Optional GitHub token (raises the API limit from 60 to 5000 requests per hour, and unchanged
-release lists then cost no quota). Hourly checks of twelve apps use 12 requests per hour without
-one, but the 60 are shared by everything behind the same public IP address:
+release lists then cost no quota). Hourly checks use one request per app (13 with the built-in
+apps) without one, but the 60 are shared by everything behind the same public IP address:
 
 ```sh
 install -m 0400 -o "$RUN_UID" /dev/stdin /srv/craft-apps/config/github-token <<<"github_pat_…"

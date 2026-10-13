@@ -18,8 +18,10 @@ app pages come from the ArtCraft Launcher catalogue vendored in `host/assets/ven
 | GridCraft | new | `storytold/gridcraft` | `gridcraft-web-{v}.zip` | 0.6.1 | 19 MB | content-hashed favicon |
 | CADCraft | new | `storytold/cadcraft` | `cadcraft-web-{v}.zip` | 0.6.2 | 21 MB | no favicon link |
 | SoundCraft | new | `storytold/soundcraft` | `soundcraft-web-{v}.zip` | 0.6.1 | 15 MB | WebAudio; no `SharedArrayBuffer` |
+| FigCraft | new | `storytold/figcraft` | `figcraft-web-{v}.zip` | 0.5.1 (13 Oct) | 22 MB | no favicon link |
 
-Common to all twelve:
+Common to all thirteen (FigCraft checked on 13 October: same layout, checksum and serving checks
+passed on install):
 
 - Each release also publishes desktop packages and `SHA256SUMS.txt`; the GitHub API reports a
   SHA-256 digest for every asset. The web archives of the versions above matched their
@@ -30,7 +32,7 @@ Common to all twelve:
 - `index.html` uses relative URLs only, so every app works under a path prefix such as
   `/photocraft/` (stable URL) or `/photocraft/0.5.0/` (a retained release).
 - Requirements from upstream `HOSTING.md` (read for WordCraft and SoundCraft; the first seven
-  were read on 8 October) and `_headers` (all twelve): `.wasm` as `application/wasm`, `.js` as
+  were read on 8 October) and `_headers` (the twelve apps of 12 October): `.wasm` as `application/wasm`, `.js` as
   `text/javascript`, gzip or Brotli compression, HTTPS (or localhost) for WebGPU, clipboard and
   storage. No cross-origin isolation headers are needed.
 - Some releases reuse the same asset names across versions (EffectCraft, LightCraft). At the
