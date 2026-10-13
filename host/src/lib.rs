@@ -11,6 +11,7 @@ pub mod candidate;
 pub mod catalog;
 pub mod config;
 pub mod daemon;
+pub mod discovery;
 pub mod doctor;
 pub mod fsutil;
 pub mod github;

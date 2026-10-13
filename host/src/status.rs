@@ -47,6 +47,13 @@ pub struct AppStatus {
     pub repository: String,
     /// Product page, or empty.
     pub website: String,
+    /// App page of a discovered app: title, text and screenshot URLs relative to the site root
+    /// (built-in apps' pages come from `launcher/catalog.json`).
+    pub headline: String,
+    pub description: String,
+    pub screenshots: Vec<String>,
+    /// Found in the ArtCraft feed at run time.
+    pub discovered: bool,
     /// Git tag and publication time of the active release.
     pub release_tag: Option<String>,
     pub released: Option<String>,
@@ -167,7 +174,8 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
         .as_ref()
         .map(|o| format!("{o}/"))
         .unwrap_or_default();
-    // The official logo, else the configured icon, else the release's own favicon.
+    // The official logo, else the configured icon, else a discovered app's logo, else the
+    // release's own favicon.
     let release_icon = |icon: &str| {
         active
             .as_ref()
@@ -186,6 +194,11 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
         active_url: active.as_ref().map(|v| format!("{base}{}/{v}/", app.entry)),
         icon: crate::assets::logo(&app.id)
             .or_else(|| release_icon(&app.icon))
+            .or_else(|| {
+                app.logo
+                    .as_ref()
+                    .map(|file| format!("launcher/discovered/{file}"))
+            })
             .or_else(|| release_icon(active_record.and_then(|r| r.icon.as_deref())?)),
         category: app.category.clone(),
         tagline: app.tagline.clone(),
@@ -195,6 +208,10 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
         group: app.group.clone(),
         repository: app.repository.clone(),
         website: app.website.clone(),
+        headline: app.headline.clone(),
+        description: app.description.clone(),
+        screenshots: crate::shots::discovered_urls(cfg, app),
+        discovered: app.discovered,
         release_tag: active_record.map(|r| r.tag.clone()),
         released: active_record
             .and_then(|r| r.published_at.clone())

@@ -140,8 +140,15 @@ app in `/admin` (takes effect at once, survives restarts and takes precedence ov
 `[apps.<id>]`. A disabled app disappears from the launcher, its URLs answer 404 and its updates
 stop; releases and state stay on disk.
 
-A Craft app published after this version of `craft-host` follows the suite's conventions, so
-`config.toml` needs only its name:
+A Craft app published after this version of `craft-host` is discovered at run time: the server
+reads the ArtCraft release feed at startup and once per `check_interval`, then installs the new
+app like the built-in ones and shows it in the launcher with the name, description, logo and
+screenshots of its page on getartcraft.com. The log reports `<id>: discovered in the ArtCraft
+feed`; disable it in `/admin` if it is not wanted. See
+[`[discovery]`](configuration.md#discovery) for the rules and for turning it off.
+
+Any other app, or a Craft app while discovery is off, is defined in `config.toml`. A Craft app
+follows the suite's conventions, so it needs only its name:
 
 ```toml
 [apps.examplecraft]
@@ -151,7 +158,8 @@ name = "ExampleCraft"
 
 Other apps set `repository` and `artifact_patterns` as well (see `config.example.toml`). Its
 launcher logo is the release's own favicon when `index.html` names one. Configuration changes
-take effect after `docker compose restart host`.
+take effect after `docker compose restart host`. A definition in `config.toml` replaces a
+discovered app with the same ID.
 
 To make such an app built in, run `scripts/sync-craft-launcher.py --icons` (it refreshes the
 vendored ArtCraft Launcher catalogue, translations and logos from `storytold/craft-launcher`),

@@ -105,6 +105,13 @@ host = ""
 # (<url>/<app>/<key>.jpg, catalogued pictures only) and cached in CACHE_DIR. "" turns them off.
 screenshots_url = "https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1"
 
+[discovery]
+# New Craft apps are found at run time in the ArtCraft release feed (at startup, then once per
+# check_interval) and installed like the built-in ones; their name, description, logo and
+# screenshots come from <metadata_url>/<id> on the ArtCraft site. "" turns either part off.
+feed_url = "https://api.storyteller.ai/v1/craft_apps/release_info"
+metadata_url = "https://getartcraft.com/apps"
+
 # Per-app settings. Built-in apps: photocraft, vectorcraft, filmcraft, lightcraft, pdfcraft,
 # effectcraft, designcraft, wordcraft, deckcraft, gridcraft, cadcraft, soundcraft, figcraft. All are
 # installed unless disabled here or in /admin (the /admin choice takes precedence). Built-in

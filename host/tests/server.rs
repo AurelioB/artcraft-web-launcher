@@ -14,6 +14,7 @@ use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use common::*;
 use craft_host::access::Role;
 use craft_host::activity::Activity;
+use craft_host::config::LiveConfig;
 use craft_host::ops::Updater;
 use craft_host::server::{Shared, router};
 use craft_host::users::{NewUser, UserDb};
@@ -44,7 +45,11 @@ fn spawn(app: axum::Router) -> String {
 }
 
 fn start(e: &Env) -> Server {
-    let shared = Shared::new(Arc::new(e.cfg.clone()), Arc::new(Activity::new())).unwrap();
+    let shared = Shared::new(
+        Arc::new(LiveConfig::new(e.cfg.clone())),
+        Arc::new(Activity::new()),
+    )
+    .unwrap();
     Server {
         url: spawn(router(shared.clone())),
         shared,
@@ -733,11 +738,14 @@ fn signed_in_apps_need_a_role_and_admin_needs_the_admin_role() {
     assert_eq!(r.header("cache-control"), Some("no-store"));
     assert_eq!(get(&format!("{u}/testcraft/1.0.0/big.js"), &[]).status, 401);
     assert_eq!(get(&format!("{u}/status.json"), &[]).status, 401);
-    // Screenshots follow the apps' rule: they reveal which apps are enabled.
-    assert_eq!(
-        get(&format!("{u}/launcher/shots/photocraft/demo.jpg"), &[]).status,
-        401
-    );
+    // Screenshots and discovered apps' logos follow the apps' rule: they reveal which apps are
+    // enabled.
+    for gated in [
+        "/launcher/shots/photocraft/demo.jpg",
+        "/launcher/discovered/newcraft.webp",
+    ] {
+        assert_eq!(get(&format!("{u}{gated}"), &[]).status, 401, "{gated}");
+    }
     // Health, sign-in, the launcher's logos, fonts and catalogue, and web app manifests (fetched
     // without cookies) stay reachable; a missing manifest is 404, not 401.
     for open in [
@@ -1554,7 +1562,11 @@ fn admins_disable_and_enable_apps_and_the_choice_survives_restarts() {
     assert!(cycle.iter().all(|(id, _)| id != "testcraft"), "{cycle:?}");
     assert!(!e.release_dir("1.1.0").exists());
     let after_restart = spawn(router(
-        Shared::new(Arc::new(restarted), Arc::new(Activity::new())).unwrap(),
+        Shared::new(
+            Arc::new(LiveConfig::new(restarted)),
+            Arc::new(Activity::new()),
+        )
+        .unwrap(),
     ));
     assert_eq!(get(&format!("{after_restart}/testcraft/"), &[]).status, 404);
     let public = json_body(&get(&format!("{after_restart}/status.json"), &[]));
@@ -1704,5 +1716,226 @@ fn launcher_data_release_icons_and_cached_screenshots() {
     assert_eq!(
         gh.hits("/shots/photocraft/nope.jpg") + gh.hits("/shots/vectorcraft/neon.jpg"),
         0
+    );
+}
+
+/// The ArtCraft feed lists `entries` (id, repository, feed name), each with a web archive.
+fn feed(entries: &[(&str, &str, &str)]) -> Vec<u8> {
+    let apps: serde_json::Map<String, serde_json::Value> = entries
+        .iter()
+        .map(|(id, repo, name)| {
+            let entry = serde_json::json!({
+                "name": name,
+                "repo": repo,
+                "latest_release": {
+                    "tag": "v1.0.0",
+                    "version": "1.0.0",
+                    "assets": [{"name": format!("{id}-web-1.0.0.zip")}],
+                },
+            });
+            (id.to_string(), entry)
+        })
+        .collect();
+    serde_json::to_vec(&serde_json::json!({"success": true, "release_info": {"apps": apps}}))
+        .unwrap()
+}
+
+fn status_app(u: &str, id: &str) -> Option<serde_json::Value> {
+    app_entry(&json_body(&get(&format!("{u}/status.json"), &[])), id).cloned()
+}
+
+#[test]
+fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
+    let gh = FakeGitHub::start();
+    let g = &gh.url;
+    // TestCraft is served at /clashcraft/, so a discovered "clashcraft" cannot be.
+    let e = env_with(
+        &gh,
+        r#"entry = "clashcraft""#,
+        "min_free_space = 0",
+        &format!("[discovery]\nfeed_url = \"{g}/feed.json\"\nmetadata_url = \"{g}/apps\"\n"),
+    );
+    gh.put_route(
+        "/feed.json",
+        feed(&[
+            ("newcraft", "storytold/newcraft", "Newcraft"),
+            ("clashcraft", "storytold/clashcraft", "ClashCraft"),
+            ("testcraft", "storytold/testcraft", "Feed TestCraft"),
+            ("artcraft-launcher", "storytold/craft-launcher", "Launcher"),
+        ]),
+    );
+    let top = "newcraft-web-1.0.0";
+    let zip_path = e.root().join("newcraft.zip");
+    let entries = craft_host::testutil::site_entries(top);
+    let refs: Vec<(&str, &[u8])> = entries
+        .iter()
+        .map(|(n, d)| (n.as_str(), d.as_slice()))
+        .collect();
+    craft_host::testutil::deflated_zip(&zip_path, &refs);
+    gh.publish(
+        "storytold/newcraft",
+        "v1.0.0",
+        std::fs::read(&zip_path).unwrap(),
+        PublishOpts {
+            asset_name: Some("newcraft-web-1.0.0.zip".into()),
+            ..PublishOpts::default()
+        },
+    );
+
+    let s = start(&e);
+    let u = &s.url;
+    assert!(status_app(u, "newcraft").is_none());
+    assert_eq!(
+        get(&format!("{u}/launcher/discovered/newcraft.webp"), &[]).status,
+        404
+    );
+
+    // Found while running, before its page exists: listed under the feed's name, no logo yet.
+    craft_host::daemon::discover(&s.shared.live);
+    let app = status_app(u, "newcraft").expect("discovered app listed");
+    assert_eq!(
+        (&app["name"], &app["discovered"], &app["icon"]),
+        (&"Newcraft".into(), &true.into(), &serde_json::Value::Null)
+    );
+    // The configured app keeps its definition; the colliding one is left out.
+    let testcraft = status_app(u, "testcraft").unwrap();
+    assert_eq!(
+        (&testcraft["name"], &testcraft["discovered"]),
+        (&"TestCraft".into(), &false.into())
+    );
+    assert!(status_app(u, "clashcraft").is_none());
+    assert_eq!(gh.hits("/apps/newcraft"), 1);
+
+    // The page appears: the next round reads it and the logo. Pictures stay on the site, also
+    // across redirects.
+    let webp = b"RIFF\x10\0\0\0WEBPVP8 logo".to_vec();
+    let png = b"\x89PNG\r\n\x1a\nscreenshot".to_vec();
+    gh.put_route("/images/apps/newcraft/icon.webp", webp.clone());
+    gh.put_route("/shots/one.png", png.clone());
+    // Another site that would serve the picture, if a redirect could lead there.
+    let elsewhere = FakeGitHub::start();
+    elsewhere.put_route("/elsewhere.png", png.clone());
+    let redirect = |to: String| Behavior {
+        status: Some(302),
+        headers: vec![("Location".into(), to)],
+        ..Behavior::default()
+    };
+    gh.behave("/shots/moved.png", redirect("/shots/one.png".into()));
+    gh.behave(
+        "/shots/away.png",
+        redirect(format!("{}/elsewhere.png", elsewhere.url)),
+    );
+    let page = format!(
+        r#"<html><head>
+<meta property="og:title" content="NewCraft: Draw &amp; paint."/>
+<meta property="og:description" content="A brand new app."/>
+<script type="application/ld+json">{{"@type":"SoftwareApplication","name":"NewCraft",
+ "description":"Everything about NewCraft.","url":"{g}/apps/newcraft",
+ "screenshot":["{g}/shots/one.png","{g}/shots/moved.png","{g}/shots/away.png","https://evil.example/x.png"],
+ "sameAs":"https://github.com/storytold/newcraft"}}</script>
+</head></html>"#
+    );
+    gh.put_route("/apps/newcraft", page.into_bytes());
+    craft_host::daemon::discover(&s.shared.live);
+    let app = status_app(u, "newcraft").unwrap();
+    assert_eq!(app["name"], "NewCraft");
+    assert_eq!(app["tagline"], "A brand new app.");
+    assert_eq!(app["headline"], "NewCraft: Draw & paint.");
+    assert_eq!(app["description"], "Everything about NewCraft.");
+    assert_eq!(app["website"], format!("{g}/apps/newcraft"));
+    assert_eq!(app["icon"], "launcher/discovered/newcraft.webp");
+    assert_eq!(
+        app["screenshots"],
+        serde_json::json!([
+            "launcher/shots/newcraft/1.png",
+            "launcher/shots/newcraft/2.png",
+            "launcher/shots/newcraft/3.png"
+        ])
+    );
+    let logo = get(&format!("{u}/launcher/discovered/newcraft.webp"), &[]);
+    assert_eq!(
+        (logo.status, logo.header("content-type")),
+        (200, Some("image/webp"))
+    );
+    assert_eq!(logo.body, webp);
+    for shot in ["1.png", "2.png"] {
+        let r = get(&format!("{u}/launcher/shots/newcraft/{shot}"), &[]);
+        assert_eq!(
+            (r.status, r.header("content-type")),
+            (200, Some("image/png")),
+            "{shot}"
+        );
+        assert_eq!(r.body, png);
+    }
+    for missing in [
+        "/launcher/shots/newcraft/3.png",
+        "/launcher/shots/newcraft/4.png",
+        "/launcher/shots/newcraft/1.webp",
+        "/launcher/discovered/apps.json",
+        "/launcher/discovered/clashcraft.webp",
+        "/launcher/discovered/..%2Fapps.json",
+    ] {
+        assert_eq!(get(&format!("{u}{missing}"), &[]).status, 404, "{missing}");
+    }
+    assert_eq!(
+        elsewhere.hits("/elsewhere.png"),
+        0,
+        "off-site redirect not followed"
+    );
+
+    // Metadata is read once; a page still missing is asked for again, without re-announcing.
+    craft_host::daemon::discover(&s.shared.live);
+    assert_eq!(
+        (gh.hits("/apps/newcraft"), gh.hits("/apps/clashcraft")),
+        (2, 3)
+    );
+
+    // Installed through the normal update path, then served.
+    let cfg = s.shared.cfg();
+    let updater = Updater::new(&cfg);
+    updater.prepare().unwrap();
+    assert!(matches!(
+        updater.update_app(cfg.app("newcraft").unwrap(), true),
+        craft_host::ops::Outcome::Installed(_)
+    ));
+    let r = get(&format!("{u}/newcraft/"), &[]);
+    assert_eq!(r.status, 200);
+    assert!(r.text().contains("app.js"));
+
+    // A feed outage changes nothing.
+    gh.behave(
+        "/feed.json",
+        Behavior {
+            status: Some(500),
+            ..Behavior::default()
+        },
+    );
+    craft_host::daemon::discover(&s.shared.live);
+    assert_eq!(status_app(u, "newcraft").unwrap()["name"], "NewCraft");
+    gh.clear_behaviors();
+
+    // A restart keeps discovered apps, still without the colliding one.
+    let restarted = craft_host::config::load_config(e.cfg.paths.clone()).unwrap();
+    let app = restarted.app("newcraft").unwrap();
+    assert!(app.discovered);
+    assert_eq!(
+        (app.name.as_str(), app.logo.as_deref()),
+        ("NewCraft", Some("newcraft.webp"))
+    );
+    assert!(restarted.app("clashcraft").is_err());
+
+    // Once config.toml defines the app, its definition wins and discovery lets go of it.
+    let mut toml = std::fs::read_to_string(&e.cfg.paths.config_file).unwrap();
+    toml.push_str("[apps.newcraft]\nname = \"Mine\"\nrepository = \"storytold/newcraft\"\n");
+    std::fs::write(&e.cfg.paths.config_file, toml).unwrap();
+    let defined = craft_host::config::load_config(e.cfg.paths.clone()).unwrap();
+    let live = LiveConfig::new(defined);
+    craft_host::daemon::discover(&live);
+    let app = live.get().app("newcraft").unwrap().clone();
+    assert_eq!((app.name.as_str(), app.discovered), ("Mine", false));
+    let saved = craft_host::discovery::load(&e.cfg.paths.state);
+    assert_eq!(
+        saved.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(),
+        ["clashcraft"]
     );
 }

@@ -3,6 +3,9 @@
 Survey of the official releases, 12 October 2026 (the first seven were also surveyed in detail
 on 8 October). The built-in manifest is `host/src/manifest.toml`; names, taglines, colors and
 app pages come from the ArtCraft Launcher catalogue vendored in `host/assets/vendor/craft-launcher`.
+Apps released later are discovered at run time from the ArtCraft feed and assumed to share the
+layout described below; their install runs the same checksum, archive and serving checks (see
+[`[discovery]`](configuration.md#discovery)).
 
 | App | Group | Repository | Web artifact | Version checked | Archive contents | Notes |
 | --- | --- | --- | --- | --- | --- | --- |

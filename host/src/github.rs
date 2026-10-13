@@ -213,6 +213,79 @@ pub(crate) fn agent(timeout_global: u64, connect: u64) -> ureq::Agent {
         .new_agent()
 }
 
+/// GET a small public resource (feed, page, picture), at most `max` bytes, within `timeout`
+/// seconds. `Ok(None)` for 404/410; any other non-200 answer, a larger body or a transport
+/// failure is an error. With `origin` (`scheme://host[:port]`), the URL and every redirect must
+/// stay on it (at most five redirects), so addresses read from a web page cannot lead elsewhere;
+/// without, redirects are followed (at most ten, ureq's default).
+pub(crate) fn fetch_public(
+    url: &str,
+    max: u64,
+    timeout: u64,
+    origin: Option<&str>,
+) -> Result<Option<Vec<u8>>, String> {
+    let mut url = url.to_string();
+    let mut resp = match origin {
+        None => agent(timeout, timeout)
+            .get(&url)
+            .call()
+            .map_err(|e| format!("{url}: {e}"))?,
+        Some(origin) => {
+            let agent: ureq::Agent = ureq::Agent::config_builder()
+                .http_status_as_error(false)
+                .max_redirects(0)
+                .timeout_connect(Some(Duration::from_secs(timeout)))
+                .timeout_global(Some(Duration::from_secs(timeout)))
+                .user_agent(USER_AGENT)
+                .build()
+                .into();
+            let mut hops = 0;
+            loop {
+                if !origin_of(&url).is_some_and(|o| o.eq_ignore_ascii_case(origin)) {
+                    return Err(format!("{url}: not on {origin}"));
+                }
+                let resp = agent.get(&url).call().map_err(|e| format!("{url}: {e}"))?;
+                if hops == 5 || !matches!(resp.status().as_u16(), 301 | 302 | 303 | 307 | 308) {
+                    break resp;
+                }
+                let location = resp
+                    .headers()
+                    .get(ureq::http::header::LOCATION)
+                    .and_then(|v| v.to_str().ok())
+                    .ok_or_else(|| format!("{url}: redirect without a location"))?;
+                url = match location.strip_prefix('/') {
+                    Some(path) if !path.starts_with('/') => format!("{origin}/{path}"),
+                    _ => location.to_string(),
+                };
+                hops += 1;
+            }
+        }
+    };
+    match resp.status().as_u16() {
+        200 => {}
+        404 | 410 => return Ok(None),
+        code => return Err(format!("{url}: HTTP {code}")),
+    }
+    let mut bytes = Vec::new();
+    resp.body_mut()
+        .as_reader()
+        .take(max + 1)
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("{url}: {e}"))?;
+    if bytes.len() as u64 > max {
+        return Err(format!("{url}: larger than {max} bytes"));
+    }
+    Ok(Some(bytes))
+}
+
+/// Origin (`scheme://host[:port]`) of an http(s) URL. Userinfo stays part of the host, so
+/// `https://site@elsewhere/` never matches `https://site`.
+pub(crate) fn origin_of(url: &str) -> Option<String> {
+    let (scheme, rest) = url.split_once("://")?;
+    let host = rest.split(['/', '?', '#']).next()?;
+    (matches!(scheme, "http" | "https") && !host.is_empty()).then(|| format!("{scheme}://{host}"))
+}
+
 impl GitHub {
     pub fn new(settings: &UpdaterSettings, token: Option<String>, cache_dir: &Path) -> Self {
         Self {
@@ -516,6 +589,11 @@ mod tests {
             website: String::new(),
             ink_light: String::new(),
             ink_dark: String::new(),
+            headline: String::new(),
+            description: String::new(),
+            screenshots: Vec::new(),
+            logo: None,
+            discovered: false,
             keep_latest: 3,
             keep_days: 30,
             origin: None,

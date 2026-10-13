@@ -206,6 +206,14 @@ pub struct AppConfig {
     pub website: String,
     pub ink_light: String,
     pub ink_dark: String,
+    /// App page text and screenshot URLs of a discovered app (built-in apps' pages come from
+    /// the catalogue), and its logo file in the discovery directory.
+    pub headline: String,
+    pub description: String,
+    pub screenshots: Vec<String>,
+    pub logo: Option<String>,
+    /// Found in the ArtCraft feed at run time, not defined by the manifest or config.toml.
+    pub discovered: bool,
     pub keep_latest: u32,
     pub keep_days: u32,
     /// Optional separate origin (scheme://host[:port]) for this app's links, giving it browser
@@ -226,6 +234,35 @@ pub struct LauncherSettings {
     pub screenshots_url: Option<String>,
 }
 
+/// Where new apps are discovered, see [`crate::discovery`]; `None` turns that part off.
+#[derive(Debug, Clone)]
+pub struct DiscoverySettings {
+    pub feed_url: Option<String>,
+    pub metadata_url: Option<String>,
+}
+
+pub const DEFAULT_FEED_URL: &str = "https://api.storyteller.ai/v1/craft_apps/release_info";
+pub const DEFAULT_METADATA_URL: &str = "https://getartcraft.com/apps";
+
+/// The configuration of a running server. Discovering an app replaces it as a whole, so each
+/// request and update cycle works on one consistent snapshot.
+#[derive(Debug)]
+pub struct LiveConfig(RwLock<Arc<Config>>);
+
+impl LiveConfig {
+    pub fn new(cfg: Config) -> Self {
+        Self(RwLock::new(Arc::new(cfg)))
+    }
+
+    pub fn get(&self) -> Arc<Config> {
+        self.0.read().clone()
+    }
+
+    pub fn replace(&self, cfg: Config) {
+        *self.0.write() = Arc::new(cfg);
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub paths: Paths,
@@ -236,6 +273,7 @@ pub struct Config {
     pub auth: AuthSettings,
     pub admin: AdminSettings,
     pub launcher: LauncherSettings,
+    pub discovery: DiscoverySettings,
     pub apps: Vec<AppConfig>,
     pub config_file_found: bool,
     pub switches: Switches,
@@ -337,6 +375,7 @@ struct RawFile {
     auth: Option<RawAuth>,
     admin: Option<RawAdmin>,
     launcher: Option<RawLauncher>,
+    discovery: Option<RawDiscovery>,
     #[serde(default)]
     apps: toml::Table,
 }
@@ -345,6 +384,13 @@ struct RawFile {
 #[serde(deny_unknown_fields)]
 struct RawLauncher {
     screenshots_url: Option<String>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawDiscovery {
+    feed_url: Option<String>,
+    metadata_url: Option<String>,
 }
 
 #[derive(Deserialize, Default)]
@@ -776,6 +822,11 @@ fn build_app(
         website: presentation(None, |c| &c.website),
         ink_light: presentation(None, |c| &c.ink_light),
         ink_dark: presentation(None, |c| &c.ink_dark),
+        headline: String::new(),
+        description: String::new(),
+        screenshots: Vec::new(),
+        logo: None,
+        discovered: false,
         keep_latest: raw.keep_latest.unwrap_or(retention.keep_latest),
         keep_days: raw.keep_days.unwrap_or(retention.keep_days),
         origin,
@@ -1150,6 +1201,12 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
             apps.push(app);
         }
     }
+    add_discovered(
+        &mut apps,
+        &crate::discovery::load(&paths.state),
+        &retention,
+        &updater,
+    );
     check_overlaps(&apps, &mut problems);
     check_roots(&paths, &mut problems);
     let server = build_server(raw.server.unwrap_or_default(), &mut problems);
@@ -1162,6 +1219,7 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         &mut problems,
     );
     let launcher = build_launcher(raw.launcher.unwrap_or_default(), &mut problems);
+    let discovery = build_discovery(raw.discovery.unwrap_or_default(), &mut problems);
     if !problems.is_empty() {
         return Err(ConfigError(problems));
     }
@@ -1189,6 +1247,7 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         auth,
         admin,
         launcher,
+        discovery,
         apps,
         config_file_found: found,
         switches,
@@ -1209,6 +1268,83 @@ fn build_launcher(raw: RawLauncher, problems: &mut Vec<String>) -> LauncherSetti
     }
     LauncherSettings {
         screenshots_url: (!url.is_empty()).then_some(url),
+    }
+}
+
+/// Add discovered apps that the manifest and config.toml do not define. One that cannot be
+/// served beside the others (its URL path or release directory is taken) is reported and left
+/// out; discovery never makes a configuration invalid.
+fn add_discovered(
+    apps: &mut Vec<AppConfig>,
+    found: &[crate::discovery::Discovered],
+    retention: &Retention,
+    updater: &UpdaterSettings,
+) {
+    for d in found {
+        if apps.iter().any(|a| a.id == d.id) {
+            continue;
+        }
+        let raw = RawApp {
+            name: Some(if d.name.is_empty() { &d.id } else { &d.name }.clone()),
+            repository: Some(d.repository.clone()),
+            tagline: (!d.tagline.is_empty()).then(|| d.tagline.clone()),
+            ..RawApp::default()
+        };
+        let mut problems = Vec::new();
+        if let Some(mut app) = build_app(&d.id, raw, retention, updater, &mut problems) {
+            if !d.website.is_empty() {
+                app.website = d.website.clone();
+            }
+            app.headline = d.headline.clone();
+            app.description = d.description.clone();
+            app.screenshots = d.screenshots.clone();
+            app.logo = d.logo.clone();
+            app.discovered = true;
+            let mut all = apps.clone();
+            all.push(app.clone());
+            check_overlaps(&all, &mut problems);
+            if problems.is_empty() {
+                apps.push(app);
+                continue;
+            }
+        }
+        log::warn!("discovered app {} left out: {}", d.id, problems.join("; "));
+    }
+}
+
+impl Config {
+    /// This configuration with `found` as its discovered apps, replacing earlier ones.
+    pub fn with_discovered(&self, found: &[crate::discovery::Discovered]) -> Config {
+        let mut cfg = self.clone();
+        cfg.apps.retain(|a| !a.discovered);
+        add_discovered(&mut cfg.apps, found, &cfg.retention, &cfg.updater);
+        cfg
+    }
+}
+
+fn optional_url(value: String, key: &str, problems: &mut Vec<String>) -> Option<String> {
+    let url = value.trim().trim_end_matches('/').to_string();
+    if !url.is_empty() && !url.starts_with("https://") && !url.starts_with("http://") {
+        problems.push(format!(
+            "{key}: {url:?} must be an http(s) URL, or \"\" to turn it off"
+        ));
+    }
+    (!url.is_empty()).then_some(url)
+}
+
+fn build_discovery(raw: RawDiscovery, problems: &mut Vec<String>) -> DiscoverySettings {
+    DiscoverySettings {
+        feed_url: optional_url(
+            raw.feed_url.unwrap_or_else(|| DEFAULT_FEED_URL.into()),
+            "[discovery] feed_url",
+            problems,
+        ),
+        metadata_url: optional_url(
+            raw.metadata_url
+                .unwrap_or_else(|| DEFAULT_METADATA_URL.into()),
+            "[discovery] metadata_url",
+            problems,
+        ),
     }
 }
 

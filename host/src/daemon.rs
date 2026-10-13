@@ -9,7 +9,7 @@ use anyhow::Result;
 use parking_lot::Mutex;
 
 use crate::activity::Activity;
-use crate::config::Config;
+use crate::config::{Config, LiveConfig};
 use crate::ops::{Outcome, Updater};
 use crate::server::{self, Shared};
 use crate::store::{AppState, Store};
@@ -111,8 +111,33 @@ pub fn activate_idle(cfg: &Config, updater: &Updater) {
     }
 }
 
-fn updater_loop(cfg: Arc<Config>, activity: Arc<Activity>, phase: Arc<Mutex<String>>) {
-    let updater = Updater::new(&cfg).with_activity(activity);
+/// Look for new apps in the ArtCraft feed; when the list of discovered apps changed, switch the
+/// running server to a configuration that includes them. Failures are logged and change
+/// nothing.
+pub fn discover(live: &LiveConfig) {
+    let cfg = live.get();
+    match crate::discovery::refresh(&cfg) {
+        Ok(Some(found)) => {
+            let next = cfg.with_discovered(&found);
+            let added: Vec<_> = next
+                .apps
+                .iter()
+                .filter(|a| a.discovered && cfg.app(&a.id).is_err())
+                .map(|a| a.id.as_str())
+                .collect();
+            if !added.is_empty() {
+                log::info!("serving discovered apps: {}", added.join(", "));
+            }
+            live.replace(next);
+        }
+        Ok(None) => {}
+        Err(e) => log::warn!("app discovery: {e:#}"),
+    }
+}
+
+fn updater_loop(live: Arc<LiveConfig>, activity: Arc<Activity>, phase: Arc<Mutex<String>>) {
+    let cfg = live.get();
+    let updater = Updater::new(&cfg).with_activity(activity.clone());
     let lock_wait = Duration::from_secs(cfg.updater.lock_wait_secs);
     // Releases installed by earlier versions lack precompressed copies; add them in the
     // background so serving starts at once.
@@ -133,7 +158,12 @@ fn updater_loop(cfg: Arc<Config>, activity: Arc<Activity>, phase: Arc<Mutex<Stri
         }
         Err(e) => log::warn!("{e:#}"),
     }
-    let mut next = first_run(&cfg, &updater.store);
+    // One feed request per check interval at most; a discovered app is due at once.
+    discover(&live);
+    let discovery_interval = cfg.updater.check_interval_secs as i64;
+    let mut next_discovery = now_epoch() + discovery_interval;
+    let cfg = live.get();
+    let mut next = first_run(&cfg, &Store::new(&cfg.paths.state));
     if next > now_epoch() {
         log::info!(
             "no app is due for a check; next check at {}",
@@ -143,13 +173,21 @@ fn updater_loop(cfg: Arc<Config>, activity: Arc<Activity>, phase: Arc<Mutex<Stri
     let mut next_tick = now_epoch() + ACTIVATION_TICK_SECS;
     loop {
         let now = now_epoch();
+        if now >= next_discovery {
+            discover(&live);
+            next_discovery = now + discovery_interval;
+            next = next.min(next_run(&live.get(), &Store::new(&cfg.paths.state)));
+        }
+        // Each round works on the current configuration, including discovered apps.
+        let cfg = live.get();
+        let updater = Updater::new(&cfg).with_activity(activity.clone());
         if now >= next_tick {
             activate_idle(&cfg, &updater);
             next_tick = now + ACTIVATION_TICK_SECS;
         }
         if now < next {
             std::thread::sleep(Duration::from_secs(
-                (next.min(next_tick) - now).clamp(1, 60) as u64,
+                (next.min(next_tick).min(next_discovery) - now).clamp(1, 60) as u64,
             ));
             continue;
         }
@@ -170,7 +208,8 @@ fn updater_loop(cfg: Arc<Config>, activity: Arc<Activity>, phase: Arc<Mutex<Stri
 }
 
 pub fn run(cfg: Config) -> Result<()> {
-    let cfg = Arc::new(cfg);
+    let live = Arc::new(LiveConfig::new(cfg));
+    let cfg = live.get();
     let activity = Arc::new(Activity::new());
     {
         let updater = Updater::new(&cfg);
@@ -202,13 +241,13 @@ pub fn run(cfg: Config) -> Result<()> {
             })?;
     }
     {
-        let (cfg, activity, phase) = (cfg.clone(), activity.clone(), phase.clone());
+        let (live, activity, phase) = (live.clone(), activity.clone(), phase.clone());
         std::thread::Builder::new()
             .name("updater".into())
-            .spawn(move || updater_loop(cfg, activity, phase))?;
+            .spawn(move || updater_loop(live, activity, phase))?;
     }
 
-    let shared = Shared::new(cfg, activity)?;
+    let shared = Shared::new(live, activity)?;
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()?

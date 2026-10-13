@@ -116,7 +116,7 @@ pub async fn index(
     }
     let mut res = page(ADMIN_HTML, "text/html; charset=utf-8");
     if cookie(&headers, CSRF_COOKIE).is_none_or(|v| v.len() < 32) {
-        let secure = cookie_secure(&s.cfg.auth, c.https);
+        let secure = cookie_secure(&s.cfg().auth, c.https);
         if let Ok(v) = HeaderValue::from_str(&csrf_cookie(&random_hex(32), secure)) {
             res.headers_mut().append(header::SET_COOKIE, v);
         }
@@ -166,7 +166,7 @@ fn authorize_change(
             "missing or invalid CSRF token",
         )));
     }
-    if !s.cfg.auth.sign_in.uses_accounts() {
+    if !s.cfg().auth.sign_in.uses_accounts() {
         return Err(Box::new(json_error(
             StatusCode::CONFLICT,
             "accounts are not used with this sign-in method",
@@ -199,7 +199,7 @@ pub async fn users_list(
         Ok(p) => p,
         Err(d) => return denied_api(d),
     };
-    let sign_in = s.cfg.auth.sign_in;
+    let sign_in = s.cfg().auth.sign_in;
     match s.users.list() {
         Ok(users) => no_store_json(
             StatusCode::OK,
@@ -212,7 +212,7 @@ pub async fn users_list(
                     .as_ref()
                     .filter(|_| sign_in.oidc())
                     .map(|o| o.settings().name.clone()),
-                provider_roles: sign_in.oidc() && s.cfg.auth.provider_roles(),
+                provider_roles: sign_in.oidc() && s.cfg().auth.provider_roles(),
                 accounts_used: sign_in.uses_accounts(),
                 min_password: MIN_PASSWORD_LEN,
             },
@@ -383,15 +383,16 @@ pub async fn api_status(
     };
     let shared = s.clone();
     let body = tokio::task::spawn_blocking(move || {
-        let store = Store::new(&shared.cfg.paths.state);
+        let cfg = shared.cfg();
+        let store = Store::new(&cfg.paths.state);
         AdminStatus {
             user: principal.user,
             auth: principal.method,
-            can_logout: shared.cfg.auth.sign_in.has_sessions(),
+            can_logout: cfg.auth.sign_in.has_sessions(),
             running: shared.jobs.running.lock().clone(),
             results: shared.jobs.results.lock().iter().cloned().collect(),
             history: store.history(None, 40),
-            status: status::build(&shared.cfg, &store, false),
+            status: status::build(&cfg, &store, false),
         }
     })
     .await;
@@ -433,10 +434,11 @@ pub async fn api_action(
     if !ACTIONS.contains(&action.as_str()) {
         return json_error(StatusCode::NOT_FOUND, "unknown action");
     }
-    let Ok(app) = s.cfg.app(&app_id) else {
+    let cfg = s.cfg();
+    let Ok(app) = cfg.app(&app_id) else {
         return json_error(StatusCode::NOT_FOUND, "unknown app");
     };
-    if !s.cfg.is_enabled(app) && action != "enable" {
+    if !cfg.is_enabled(app) && action != "enable" {
         return json_error(StatusCode::CONFLICT, "app is disabled; enable it first");
     }
     let version = body
@@ -491,11 +493,11 @@ fn run_action(
     version: Option<&str>,
     user: &str,
 ) -> (bool, String) {
-    let cfg = &s.cfg;
+    let cfg = s.cfg();
     let Ok(app) = cfg.app(app_id) else {
         return (false, "unknown app".into());
     };
-    let updater = Updater::new(cfg).with_activity(s.activity.clone());
+    let updater = Updater::new(&cfg).with_activity(s.activity.clone());
     let _lock = match updater.store.lock(
         Duration::from_secs(cfg.updater.lock_wait_secs),
         &format!("admin {user}: {action} {app_id}"),

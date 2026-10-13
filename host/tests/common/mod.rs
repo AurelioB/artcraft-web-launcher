@@ -306,6 +306,10 @@ artifact_patterns = ["testcraft-web-{{version}}.zip", "oldcraft-web-{{version}}.
     for id in manifest["apps"].as_table().unwrap().keys() {
         toml.push_str(&format!("[apps.{id}]\nenabled = false\n"));
     }
+    // Tests never reach the real ArtCraft feed or site unless they configure discovery.
+    if !sections.contains("[discovery]") {
+        toml.push_str("[discovery]\nfeed_url = \"\"\nmetadata_url = \"\"\n");
+    }
     toml.push_str(sections);
     std::fs::write(&paths.config_file, toml).unwrap();
     let cfg = load_config(paths).unwrap_or_else(|e| panic!("{e}"));

@@ -17,7 +17,7 @@ use axum::routing::{get, post};
 use crate::activity::Activity;
 use crate::admin::{self, Jobs};
 use crate::auth::{Sessions, Throttle, request_host};
-use crate::config::{AppConfig, Config};
+use crate::config::{AppConfig, Config, LiveConfig};
 use crate::layout::{self, MARKER, valid_release_name};
 use crate::login;
 use crate::oidc::Oidc;
@@ -32,7 +32,8 @@ const LAUNCHER_HTML: &str = include_str!("../assets/index.html");
 const INSTALLING_HTML: &str = include_str!("../assets/installing.html");
 
 pub struct Shared {
-    pub cfg: Arc<Config>,
+    /// Replaced when apps are discovered; read it with [`Shared::cfg`].
+    pub live: Arc<LiveConfig>,
     pub activity: Arc<Activity>,
     pub users: UserDb,
     pub sessions: Sessions,
@@ -43,7 +44,8 @@ pub struct Shared {
 }
 
 impl Shared {
-    pub fn new(cfg: Arc<Config>, activity: Arc<Activity>) -> anyhow::Result<Arc<Self>> {
+    pub fn new(live: Arc<LiveConfig>, activity: Arc<Activity>) -> anyhow::Result<Arc<Self>> {
+        let cfg = live.get();
         let oidc = cfg
             .auth
             .oidc
@@ -56,9 +58,14 @@ impl Shared {
             oidc,
             jobs: Jobs::default(),
             shots: crate::shots::Shots::default(),
-            cfg,
+            live,
             activity,
         }))
+    }
+
+    /// The current configuration snapshot.
+    pub fn cfg(&self) -> Arc<Config> {
+        self.live.get()
     }
 }
 
@@ -97,32 +104,52 @@ async fn launcher_asset(Path(path): Path<String>) -> Response<Body> {
     res
 }
 
-/// `/launcher/shots/<app>/<key>.jpg`: an upstream screenshot, fetched once and cached.
-async fn launcher_shot(
-    State(s): State<Arc<Shared>>,
-    Path((app, file)): Path<(String, String)>,
-) -> Response<Body> {
-    let Some(key) = file.strip_suffix(".jpg").map(str::to_string) else {
-        return simple(StatusCode::NOT_FOUND, "not found\n");
-    };
-    let shared = s.clone();
-    let found = tokio::task::spawn_blocking(move || shared.shots.get(&shared.cfg, &app, &key))
-        .await
-        .ok()
-        .flatten();
-    let Some(bytes) = found else {
-        return simple(StatusCode::NOT_FOUND, "not found\n");
-    };
+fn picture(bytes: Vec<u8>, content_type: &'static str) -> Response<Body> {
     let mut res = Response::new(Body::from(bytes));
     res.headers_mut()
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static("image/jpeg"));
-    // The pictures are pinned to an upstream tag; a new tag comes with a new image.
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
     res.headers_mut().insert(
         header::CACHE_CONTROL,
         HeaderValue::from_static("public, max-age=86400"),
     );
     set_common_headers(&mut res);
     res
+}
+
+/// `/launcher/shots/<app>/<file>`: a catalogued or discovered app's screenshot, fetched once
+/// and cached.
+async fn launcher_shot(
+    State(s): State<Arc<Shared>>,
+    Path((app, file)): Path<(String, String)>,
+) -> Response<Body> {
+    let shared = s.clone();
+    let found = tokio::task::spawn_blocking(move || shared.shots.get(&shared.cfg(), &app, &file))
+        .await
+        .ok()
+        .flatten();
+    match found {
+        Some(p) => picture(p.bytes, p.content_type),
+        None => simple(StatusCode::NOT_FOUND, "not found\n"),
+    }
+}
+
+/// `/launcher/discovered/<file>`: the logo of an enabled discovered app.
+async fn discovered_logo(State(s): State<Arc<Shared>>, Path(file): Path<String>) -> Response<Body> {
+    let cfg = s.cfg();
+    let known = cfg
+        .enabled_apps()
+        .any(|a| a.discovered && a.logo.as_deref() == Some(file.as_str()));
+    let content_type = file
+        .rsplit_once('.')
+        .and_then(|(_, ext)| crate::shots::content_type(ext));
+    let (true, Some(content_type)) = (known, content_type) else {
+        return simple(StatusCode::NOT_FOUND, "not found\n");
+    };
+    let path = crate::discovery::dir(&cfg.paths.state).join(&file);
+    match tokio::fs::read(path).await {
+        Ok(bytes) => picture(bytes, content_type),
+        Err(_) => simple(StatusCode::NOT_FOUND, "not found\n"),
+    }
 }
 async fn healthz() -> Response<Body> {
     let mut r = simple(StatusCode::OK, "ok\n");
@@ -136,21 +163,18 @@ fn find_entry<'a>(cfg: &'a Config, entry: &str) -> Option<&'a AppConfig> {
 }
 
 async fn readyz(State(s): State<Arc<Shared>>, Path(entry): Path<String>) -> Response<Body> {
-    match find_entry(&s.cfg, &entry) {
-        Some(app) if layout::active_version(&s.cfg, app).is_some() => healthz().await,
+    let cfg = s.cfg();
+    match find_entry(&cfg, &entry) {
+        Some(app) if layout::active_version(&cfg, app).is_some() => healthz().await,
         Some(_) => simple(StatusCode::SERVICE_UNAVAILABLE, "not ready\n"),
         None => simple(StatusCode::NOT_FOUND, "not found\n"),
     }
 }
 
 async fn status_json(State(s): State<Arc<Shared>>) -> Response<Body> {
-    let shared = s.clone();
+    let cfg = s.cfg();
     let built = tokio::task::spawn_blocking(move || {
-        serde_json::to_vec(&status::build(
-            &shared.cfg,
-            &Store::new(&shared.cfg.paths.state),
-            true,
-        ))
+        serde_json::to_vec(&status::build(&cfg, &Store::new(&cfg.paths.state), true))
     })
     .await;
     let Ok(Ok(body)) = built else {
@@ -174,8 +198,8 @@ fn installing() -> Response<Body> {
 }
 
 /// A retained release directory named by the first path segment, e.g. `0.5.0`.
-fn retained_release(s: &Shared, app: &AppConfig, segment: &str) -> Option<std::path::PathBuf> {
-    let root = s.cfg.release_root(app).join(segment);
+fn retained_release(cfg: &Config, app: &AppConfig, segment: &str) -> Option<std::path::PathBuf> {
+    let root = cfg.release_root(app).join(segment);
     (valid_release_name(segment) && root.join(MARKER).is_file()).then_some(root)
 }
 
@@ -197,7 +221,8 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
         .unwrap_or_default();
     let mut parts = path.trim_start_matches('/').splitn(2, '/');
     let entry = parts.next().unwrap_or("");
-    let Some(app) = find_entry(&s.cfg, entry) else {
+    let cfg = s.cfg();
+    let Some(app) = find_entry(&cfg, entry) else {
         return simple(StatusCode::NOT_FOUND, "not found\n");
     };
     // /photocraft
@@ -208,7 +233,7 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
         Some((f, a)) => (f, Some(a)),
         None => (inner, None),
     };
-    if let Some(root) = retained_release(&s, app, first) {
+    if let Some(root) = retained_release(&cfg, app, first) {
         return match after {
             // /photocraft/0.5.0
             None => redirect(StatusCode::MOVED_PERMANENTLY, &format!("{first}/{query}")),
@@ -226,7 +251,7 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
         };
     }
     // /photocraft/… from the active release.
-    let Some(active) = layout::active_version(&s.cfg, app) else {
+    let Some(active) = layout::active_version(&cfg, app) else {
         return if inner.is_empty() {
             installing()
         } else {
@@ -234,12 +259,12 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
         };
     };
     let rest = format!("/{inner}{query}");
-    let releases = s.cfg.release_root(app);
+    let releases = cfg.release_root(app);
     let mut version = active;
     if fallback_allowed(&rest)
         && release_path(&releases.join(&version), &rest).is_some_and(|p| !p.exists())
     {
-        let state = Store::new(&s.cfg.paths.state)
+        let state = Store::new(&cfg.paths.state)
             .load(&app.id)
             .unwrap_or_default();
         let mut others: Vec<_> = state
@@ -249,7 +274,7 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
             .collect();
         others.sort_by(|a, b| b.1.installed_at.cmp(&a.1.installed_at));
         if let Some((v, _)) = others.into_iter().find(|(v, _)| {
-            retained_release(&s, app, v).is_some()
+            retained_release(&cfg, app, v).is_some()
                 && release_path(&releases.join(v.as_str()), &rest).is_some_and(|p| p.exists())
         }) {
             version = v.clone();
@@ -270,8 +295,8 @@ async fn host_gate(
 ) -> Response<Body> {
     let path = req.uri().path();
     let is_admin = path == "/admin" || path.starts_with("/admin/");
-    if let Some(admin_host) = &s.cfg.admin.host {
-        let host = request_host(req.headers(), peer.ip(), &s.cfg.server);
+    if let Some(admin_host) = &s.cfg().admin.host {
+        let host = request_host(req.headers(), peer.ip(), &s.cfg().server);
         // Ports are ignored unless the configured host names one.
         let on_admin_host = host.as_deref().is_some_and(|h| {
             h == admin_host
@@ -283,7 +308,7 @@ async fn host_gate(
             return simple(StatusCode::NOT_FOUND, "not found\n");
         }
     }
-    if is_admin && !s.cfg.admin.enabled {
+    if is_admin && !s.cfg().admin.enabled {
         return simple(StatusCode::NOT_FOUND, "not found\n");
     }
     next.run(req).await
@@ -293,6 +318,7 @@ pub fn router(shared: Arc<Shared>) -> Router {
     Router::new()
         .route("/", get(launcher))
         .route("/launcher/shots/{app}/{file}", get(launcher_shot))
+        .route("/launcher/discovered/{file}", get(discovered_logo))
         .route("/launcher/{*path}", get(launcher_asset))
         .route("/status.json", get(status_json))
         .route("/healthz", get(healthz))
@@ -329,11 +355,11 @@ pub fn router(shared: Arc<Shared>) -> Router {
 
 /// Serve until the process is stopped.
 pub async fn serve(shared: Arc<Shared>) -> anyhow::Result<()> {
-    let addr = shared.cfg.server.listen;
+    let addr = shared.cfg().server.listen;
     let listener = tokio::net::TcpListener::bind(addr).await?;
     log::info!("listening on http://{addr}");
-    if shared.cfg.admin.enabled {
-        match &shared.cfg.admin.host {
+    if shared.cfg().admin.enabled {
+        match &shared.cfg().admin.host {
             Some(h) => log::info!("admin interface on host {h}, path /admin/"),
             None => log::info!(
                 "admin interface at /admin/, on the apps' browser origin (set [admin] host to separate it; see docs/admin.md)"

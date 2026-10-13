@@ -157,3 +157,34 @@ Against GitHub with the release binary:
 Not verified for 0.2.0: the five new apps rendering and editing in a browser with a GPU; their
 browser-storage names; translations other than German and Russian (Russian only against a
 fixture).
+
+## 0.3.0 (13 October 2026): app discovery
+
+`cargo test` (unit 56, lifecycle 17, HTTP/admin 15): all passed, with `cargo clippy
+--all-targets -- -D warnings` clean. New coverage: which feed entries qualify (owner, web
+archive of the latest version, launcher and malformed entries skipped); reading an app page
+(the app's own `SoftwareApplication` object, `og:` tags, entities, off-site and script URLs
+dropped); and one end-to-end test against a fake feed, site and GitHub. In that test an app is
+found by a running server and listed under the feed's name, then picks up its page, logo and
+screenshots once the page exists. Screenshots are served through the proxy, including a
+same-site redirect; a redirect to another site is never requested (a mutation that lifted the
+origin lock made the test fail). The app installs through the normal update path and survives a
+restart. A configured app with the same ID wins, a colliding app is left out without being
+re-announced, a feed outage changes nothing, and a later `config.toml` definition takes the app
+over. Logos and screenshots of discovered apps need sign-in when the apps do.
+
+Against local mirrors with the debug binary:
+
+- **Scheduling, no manual steps**: `serve` started with an empty feed and a fake GitHub API.
+  The app was then added to the feed; the next discovery round (60 s `check_interval`)
+  discovered it, and the same daemon round installed and activated it (checksum verified,
+  serving check passed). `/schedcraft/` answered 200.
+- **Real page format**: the live FigCraft page, its pictures and the live feed were mirrored
+  under a new ID. The launcher (headless Chromium, signed in) showed the app's card with its
+  logo and tagline. Its app page showed the `og:title` headline, the description and all seven
+  screenshots (WebP, 1440 px) served by the proxy, with no console errors. The card menu linked
+  the app page. Signed out, the logo and screenshot URLs answered 401. `/admin` listed the app
+  with its controls.
+
+The live feed currently lists no app that this version does not already include, so no real app
+has been discovered in production yet.

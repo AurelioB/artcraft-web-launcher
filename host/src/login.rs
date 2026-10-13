@@ -41,8 +41,8 @@ pub struct Ctx {
 pub fn ctx(s: &Shared, headers: &HeaderMap, peer: SocketAddr) -> Ctx {
     Ctx {
         peer: peer.ip(),
-        host: request_host(headers, peer.ip(), &s.cfg.server),
-        https: client_is_https(headers, peer.ip(), &s.cfg.server),
+        host: request_host(headers, peer.ip(), &s.cfg().server),
+        https: client_is_https(headers, peer.ip(), &s.cfg().server),
     }
 }
 
@@ -72,7 +72,7 @@ fn db_failed(e: UserError) -> Denied {
 /// Sessions are checked against the database on every request, so deleted accounts, role
 /// changes and new passwords (in this process or from the CLI) apply at once.
 pub fn authenticate(s: &Shared, headers: &HeaderMap, c: &Ctx) -> Result<Principal, Denied> {
-    let auth = &s.cfg.auth;
+    let auth = &s.cfg().auth;
     match auth.sign_in {
         SignIn::None => Ok(Principal {
             user_id: None,
@@ -96,7 +96,7 @@ pub fn authenticate(s: &Shared, headers: &HeaderMap, c: &Ctx) -> Result<Principa
                 _ => Err(Denied::Login),
             }
         }
-        SignIn::Proxy => match proxy_identity(headers, c.peer, &s.cfg.server, auth) {
+        SignIn::Proxy => match proxy_identity(headers, c.peer, &s.cfg().server, auth) {
             Some((u, g)) => match auth.role_for(&u, &g) {
                 Some(role) => Ok(Principal {
                     user_id: None,
@@ -119,7 +119,7 @@ pub fn denied_page(s: &Shared, d: Denied, path: &str, query: Option<&str>) -> Re
             let next = path.trim_start_matches('/').to_string()
                 + &query.map(|q| format!("?{q}")).unwrap_or_default();
             // OIDC as the only method: straight to the provider.
-            let page = match s.cfg.auth.sign_in {
+            let page = match s.cfg().auth.sign_in {
                 SignIn::Interactive {
                     local: false,
                     oidc: true,
@@ -159,15 +159,16 @@ fn is_navigation(headers: &HeaderMap) -> bool {
 /// Paths that are never behind the apps gate: health, sign-in, the launcher's static files
 /// (logos, fonts, catalogue, translations), /admin, which checks for the admin role itself, and
 /// web app manifests, which browsers fetch without cookies (they describe the app: name, icons,
-/// colors, start URL). Screenshots are not static: they exist only for enabled apps and are
-/// fetched on demand, so they follow the apps' access rule.
+/// colors, start URL). Screenshots and discovered apps' logos are not static: they exist only
+/// for enabled apps, so they follow the apps' access rule.
 fn open_path(path: &str) -> bool {
     path == "/healthz"
         || path == "/admin"
         || (["/readyz/", "/auth/", "/launcher/", "/admin/"]
             .iter()
             .any(|p| path.starts_with(p))
-            && !path.starts_with("/launcher/shots/"))
+            && !path.starts_with("/launcher/shots/")
+            && !path.starts_with("/launcher/discovered/"))
         || path.ends_with(".webmanifest")
 }
 
@@ -179,7 +180,7 @@ pub async fn apps_gate(
     req: Request,
     next: Next,
 ) -> Response<Body> {
-    if s.cfg.auth.apps == AppsAccess::Public || open_path(req.uri().path()) {
+    if s.cfg().auth.apps == AppsAccess::Public || open_path(req.uri().path()) {
         return next.run(req).await;
     }
     let c = ctx(&s, req.headers(), peer);
@@ -227,7 +228,7 @@ fn forbidden(message: &str) -> Response<Body> {
 }
 
 fn set_session(res: &mut Response<Body>, s: &Shared, c: &Ctx, token: &str, max_age: u64) {
-    let v = session_cookie(token, max_age, cookie_secure(&s.cfg.auth, c.https));
+    let v = session_cookie(token, max_age, cookie_secure(&s.cfg().auth, c.https));
     res.headers_mut().append(
         header::SET_COOKIE,
         HeaderValue::from_str(&v).expect("cookie is ASCII"),
@@ -242,12 +243,12 @@ fn start_session(s: &Shared, user: &User, method: &'static str) -> String {
             version: user.session_version,
             method,
         },
-        s.cfg.auth.session_ttl_secs,
+        s.cfg().auth.session_ttl_secs,
     )
 }
 
 pub async fn login_page(State(s): State<Arc<Shared>>) -> Response<Body> {
-    if !s.cfg.auth.sign_in.has_sessions() {
+    if !s.cfg().auth.sign_in.has_sessions() {
         return not_found();
     }
     page(LOGIN_HTML, "text/html; charset=utf-8")
@@ -259,7 +260,7 @@ pub async fn style() -> Response<Body> {
 
 /// What the sign-in page offers.
 pub async fn options(State(s): State<Arc<Shared>>) -> Response<Body> {
-    let sign_in = s.cfg.auth.sign_in;
+    let sign_in = s.cfg().auth.sign_in;
     let oidc = s
         .oidc
         .as_ref()
@@ -284,7 +285,7 @@ pub async fn login_submit(
     headers: HeaderMap,
     Form(form): Form<LoginForm>,
 ) -> Response<Body> {
-    if !s.cfg.auth.sign_in.local() {
+    if !s.cfg().auth.sign_in.local() {
         return not_found();
     }
     let c = ctx(&s, &headers, peer);
@@ -332,7 +333,7 @@ pub async fn login_submit(
     );
     let token = start_session(&s, &account, "local");
     let mut res = redirect(StatusCode::SEE_OTHER, &format!("../{next}"));
-    set_session(&mut res, &s, &c, &token, s.cfg.auth.session_ttl_secs);
+    set_session(&mut res, &s, &c, &token, s.cfg().auth.session_ttl_secs);
     res
 }
 
@@ -380,7 +381,7 @@ pub async fn oidc_login(
     headers: HeaderMap,
     Query(q): Query<OidcStart>,
 ) -> Response<Body> {
-    if s.oidc.is_none() || !s.cfg.auth.sign_in.oidc() {
+    if s.oidc.is_none() || !s.cfg().auth.sign_in.oidc() {
         return not_found();
     }
     let c = ctx(&s, &headers, peer);
@@ -434,7 +435,7 @@ pub async fn oidc_login(
             let mut res = redirect(StatusCode::SEE_OTHER, &url);
             res.headers_mut().append(
                 header::SET_COOKIE,
-                oidc_state_cookie(&state, 600, cookie_secure(&s.cfg.auth, c.https)),
+                oidc_state_cookie(&state, 600, cookie_secure(&s.cfg().auth, c.https)),
             );
             res
         }
@@ -467,7 +468,7 @@ pub async fn oidc_callback(
     headers: HeaderMap,
     Query(q): Query<Callback>,
 ) -> Response<Body> {
-    let Some(oidc) = s.oidc.as_ref().filter(|_| s.cfg.auth.sign_in.oidc()) else {
+    let Some(oidc) = s.oidc.as_ref().filter(|_| s.cfg().auth.sign_in.oidc()) else {
         return not_found();
     };
     let c = ctx(&s, &headers, peer);
@@ -495,7 +496,7 @@ pub async fn oidc_callback(
         _ => return simple(StatusCode::INTERNAL_SERVER_ERROR, "internal error\n"),
     };
     let settings = oidc.settings();
-    let clear_state = oidc_state_cookie("", 0, cookie_secure(&s.cfg.auth, c.https));
+    let clear_state = oidc_state_cookie("", 0, cookie_secure(&s.cfg().auth, c.https));
 
     // Linking: the identity goes to the account that started the flow, which must still be the
     // one signed in here.
@@ -529,7 +530,7 @@ pub async fn oidc_callback(
         };
     }
 
-    let auth = &s.cfg.auth;
+    let auth = &s.cfg().auth;
     let provider_role = if auth.provider_roles() {
         match auth.role_for(&identity.user, &identity.groups) {
             Some(r) => Some(r),
@@ -624,7 +625,7 @@ pub async fn me(
     match authenticate(&s, &headers, &c) {
         Ok(p) => {
             let admin_url =
-                (p.role == Role::Admin && s.cfg.admin.enabled && s.cfg.admin.host.is_none())
+                (p.role == Role::Admin && s.cfg().admin.enabled && s.cfg().admin.host.is_none())
                     .then(|| "admin/".to_string());
             let unlinked = p
                 .user_id
@@ -633,10 +634,10 @@ pub async fn me(
             let link_name = s
                 .oidc
                 .as_ref()
-                .filter(|_| unlinked && s.cfg.auth.sign_in.oidc())
+                .filter(|_| unlinked && s.cfg().auth.sign_in.oidc())
                 .map(|o| o.settings().name.clone());
             let me = Me {
-                can_logout: s.cfg.auth.sign_in.has_sessions(),
+                can_logout: s.cfg().auth.sign_in.has_sessions(),
                 link_url: link_name
                     .as_ref()
                     .map(|_| "auth/oidc/login?link=1&next=".to_string()),

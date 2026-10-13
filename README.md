@@ -19,9 +19,10 @@ browse folders on the server.
   checksum-verified and can activate immediately or after an idle period.
 - `/admin/` can check, update, apply, pin, roll back, enable and disable apps and manage
   users. It is disabled by default; the launcher and apps are public by default.
-- Every app is installed automatically unless an administrator disables it. Craft apps added
-  later need only an `[apps.<id>]` section with a name: repository and archive names follow
-  the suite's conventions.
+- Every app is installed automatically unless an administrator disables it. Craft apps
+  released later are discovered at run time from the ArtCraft release feed, with their name,
+  description, logo and screenshots from getartcraft.com; other apps need only an
+  `[apps.<id>]` section.
 - Local accounts, OpenID Connect, HTTP Basic and trusted reverse-proxy sign-in are
   supported. No Docker socket, privileged container, GPU or database server is needed.
 

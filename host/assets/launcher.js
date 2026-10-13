@@ -141,7 +141,7 @@ function menu(app) {
   const node = el("details", { class: "menu" });
   const summary = el("summary", { "aria-label": t("{name} details", { name: app.name }) }, "…");
   const items = el("div", { class: "menu-items" });
-  if (app.catalogue?.details)
+  if (app.details)
     items.append(
       el(
         "a",
@@ -252,8 +252,18 @@ function renderList() {
   } else container.append(table(listed));
   container.setAttribute("aria-busy", "false");
 }
+/** A discovered app's page, from what status.json tells about it; `undefined` for other apps. */
+function discoveredDetails(app) {
+  if (!app.discovered) return undefined;
+  const shots = Array.isArray(app.screenshots) ? app.screenshots : [];
+  return {
+    headline: app.headline || app.tagline || "",
+    about: app.description ? [app.description] : [],
+    shots: shots.filter((src) => typeof src === "string").map((src) => ({ src })),
+  };
+}
 function renderDetails(app) {
-  const details = app.catalogue.details;
+  const details = app.details;
   const node = tint(el("div", { class: "details" }), app);
   const back = el(
     "a",
@@ -280,13 +290,23 @@ function renderDetails(app) {
     }
     node.append(features);
   }
-  if (status.launcher?.screenshots && /^[A-Za-z0-9_-]+$/.test(app.id) && details.shots?.length) {
+  const shots = (details.shots ?? []).flatMap((shot) => {
+    // A discovered app's screenshots come as launcher URLs from status.json.
+    if (typeof shot.src === "string") return [{ src: shot.src, caption: shot.caption ?? "" }];
+    const catalogued =
+      status.launcher?.screenshots &&
+      /^[A-Za-z0-9_-]+$/.test(app.id) &&
+      /^[A-Za-z0-9_-]+$/.test(shot.key);
+    return catalogued
+      ? [{ src: `launcher/shots/${app.id}/${shot.key}.jpg`, caption: shot.caption ?? "" }]
+      : [];
+  });
+  if (shots.length) {
     const gallery = el("div", { class: "gallery" });
-    for (const shot of details.shots) {
-      if (!/^[A-Za-z0-9_-]+$/.test(shot.key)) continue;
+    for (const shot of shots) {
       const figure = el("figure");
       const image = el("img", {
-        src: `launcher/shots/${app.id}/${shot.key}.jpg`,
+        src: shot.src,
         loading: "lazy",
         alt: shot.caption || app.name,
       });
@@ -298,7 +318,8 @@ function renderDetails(app) {
         },
         { once: true },
       );
-      figure.append(image, el("figcaption", {}, shot.caption));
+      figure.append(image);
+      if (shot.caption) figure.append(el("figcaption", {}, shot.caption));
       gallery.append(figure);
     }
     node.append(gallery);
@@ -321,7 +342,7 @@ function route() {
   } catch {
     id = null;
   }
-  const app = apps.find((item) => item.id === id && item.catalogue?.details);
+  const app = apps.find((item) => item.id === id && item.details);
   const entering = !!app && !showingDetails;
   const leaving = !app && showingDetails;
   if (entering) listScroll = window.scrollY;
@@ -426,6 +447,7 @@ async function load() {
       name: String(app.name || app.id),
       tagline: app.tagline ?? entry?.app.tagline ?? "",
       catalogue: entry?.app,
+      details: entry?.app.details ?? discoveredDetails(app),
       order: entry?.order ?? extraOrder++,
     };
   });
