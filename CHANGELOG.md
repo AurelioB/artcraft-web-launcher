@@ -3,6 +3,24 @@
 All notable changes to Craft Apps Host are documented here. This project follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.3.0] - 2026-10-13
+
+### Added
+
+- New Craft apps are discovered at run time from the ArtCraft release feed (at startup, then
+  once per `check_interval`) and installed like the built-in ones, without a new image or a
+  config change. Their name, description, logo and screenshots come from the app's page on
+  getartcraft.com (schema.org data and `og:` tags; only that site's URLs, also across
+  redirects, with bounded downloads). Discovered apps are kept in `STATE_DIR/discovered`;
+  apps from the manifest or `config.toml` always take precedence. New `[discovery]` settings
+  `feed_url` and `metadata_url` (`""` turns either off).
+- The launcher shows app pages for discovered apps, with their screenshots served through the
+  server like the catalogue's.
+
+### Changed
+
+- `/launcher/shots/<app>/<file>` also serves PNG and WebP pictures (discovered apps).
+
 ## [0.2.4] - 2026-10-13
 
 ### Added
@@ -94,6 +112,7 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.3.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.3.0
 [0.2.4]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.4
 [0.2.3]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.3
 [0.2.2]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.2
