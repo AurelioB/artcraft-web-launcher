@@ -10,7 +10,7 @@ use craft_host::ops::{Outcome, Updater};
 use craft_host::users::{NewUser, UserDb, UserUpdate};
 use craft_host::{daemon, doctor, fsutil, layout, logging, status};
 
-/// Craft Apps Host: serves the Craft browser apps, keeps them updated, and the operator CLI.
+/// ArtCraft Web Launcher: serves the Craft browser apps, keeps them updated, and the operator CLI.
 #[derive(Parser)]
 #[command(version, about)]
 struct Cli {

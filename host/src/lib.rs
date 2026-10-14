@@ -1,5 +1,6 @@
-//! Craft Apps Host: serves the official Craft browser apps under stable per-app paths, keeps them
-//! updated from their GitHub releases, and offers an administration interface.
+//! ArtCraft Web Launcher (`craft-host`): serves the official Craft browser apps under stable
+//! per-app paths, keeps them updated from their GitHub releases, and offers an administration
+//! interface.
 
 pub mod access;
 pub mod activity;

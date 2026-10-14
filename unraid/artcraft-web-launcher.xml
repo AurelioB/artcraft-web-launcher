@@ -1,33 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Container version="2">
-  <Name>craft-host</Name>
-  <Repository>ghcr.io/aureliob/craft-host:latest</Repository>
-  <Registry>https://github.com/AurelioB/craft-server/pkgs/container/craft-host</Registry>
+  <Name>artcraft-web-launcher</Name>
+  <Repository>ghcr.io/aureliob/artcraft-web-launcher:latest</Repository>
+  <Registry>https://github.com/AurelioB/artcraft-web-launcher/pkgs/container/artcraft-web-launcher</Registry>
   <Network>bridge</Network>
   <Privileged>false</Privileged>
-  <Support>https://github.com/AurelioB/craft-server/issues</Support>
-  <Project>https://github.com/AurelioB/craft-server</Project>
-  <Overview>Self-hosted Craft browser apps (PhotoCraft, VectorCraft, WordCraft and more), kept up to date from their official GitHub releases, with a launcher, optional sign-in and an admin interface.</Overview>
+  <Support>https://github.com/AurelioB/artcraft-web-launcher/issues</Support>
+  <Project>https://github.com/AurelioB/artcraft-web-launcher</Project>
+  <Overview>ArtCraft Web Launcher: self-hosted Craft browser apps (PhotoCraft, VectorCraft, WordCraft and more), kept up to date from their official GitHub releases, with a launcher, optional sign-in and an admin interface.</Overview>
   <Category>Productivity:</Category>
   <WebUI>http://[IP]:[PORT:8080]/</WebUI>
   <ExtraParams>--user=99:100 --read-only --cap-drop=ALL --security-opt=no-new-privileges --init --tmpfs=/tmp:mode=1777,size=16m --workdir=/srv/work</ExtraParams>
 
   <Config Name="WebUI Port" Target="8080" Default="8080" Mode="tcp" Description="Launcher and apps (HTTP)" Type="Port" Display="always" Required="true" Mask="false">8080</Config>
 
-  <Config Name="Configuration" Target="/config" Default="/mnt/user/appdata/craft-host/config" Mode="ro" Description="config.toml and secret files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/craft-host/config</Config>
-  <Config Name="App data" Target="/srv/data" Default="/mnt/user/appdata/craft-host/data" Mode="rw" Description="Installed app releases" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/craft-host/data</Config>
-  <Config Name="State" Target="/srv/state" Default="/mnt/user/appdata/craft-host/state" Mode="rw" Description="Updater state and user database" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/craft-host/state</Config>
-  <Config Name="Cache" Target="/srv/cache" Default="/mnt/user/appdata/craft-host/cache" Mode="rw" Description="Downloaded release archives" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/craft-host/cache</Config>
-  <Config Name="Work" Target="/srv/work" Default="/mnt/user/appdata/craft-host/work" Mode="rw" Description="Downloads in progress" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/craft-host/work</Config>
+  <Config Name="Configuration" Target="/config" Default="/mnt/user/appdata/artcraft-web-launcher/config" Mode="ro" Description="config.toml and secret files (read-only)" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/artcraft-web-launcher/config</Config>
+  <Config Name="App data" Target="/srv/data" Default="/mnt/user/appdata/artcraft-web-launcher/data" Mode="rw" Description="Installed app releases" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/artcraft-web-launcher/data</Config>
+  <Config Name="State" Target="/srv/state" Default="/mnt/user/appdata/artcraft-web-launcher/state" Mode="rw" Description="Updater state and user database" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/artcraft-web-launcher/state</Config>
+  <Config Name="Cache" Target="/srv/cache" Default="/mnt/user/appdata/artcraft-web-launcher/cache" Mode="rw" Description="Downloaded release archives" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/artcraft-web-launcher/cache</Config>
+  <Config Name="Work" Target="/srv/work" Default="/mnt/user/appdata/artcraft-web-launcher/work" Mode="rw" Description="Downloads in progress" Type="Path" Display="always" Required="true" Mask="false">/mnt/user/appdata/artcraft-web-launcher/work</Config>
 
   <Config Name="FILE_UMASK" Target="FILE_UMASK" Default="0002" Mode="" Description="Creation mask for files the server writes" Type="Variable" Display="advanced" Required="false" Mask="false">0002</Config>
   <Config Name="CRAFT_LOG_LEVEL" Target="CRAFT_LOG_LEVEL" Default="info" Mode="" Description="debug, info, warn or error" Type="Variable" Display="advanced" Required="false" Mask="false">info</Config>
 
   <Config Name="RUN_UID" Target="RUN_UID" Default="99" Mode="" Description="For doctor only: must match --user in Extra Parameters" Type="Variable" Display="advanced" Required="false" Mask="false">99</Config>
   <Config Name="RUN_GID" Target="RUN_GID" Default="100" Mode="" Description="For doctor only: must match --user in Extra Parameters" Type="Variable" Display="advanced" Required="false" Mask="false">100</Config>
-  <Config Name="CRAFT_HOST_CONFIG_DIR" Target="CRAFT_HOST_CONFIG_DIR" Default="/mnt/user/appdata/craft-host/config" Mode="" Description="For doctor only: host path of Configuration" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/craft-host/config</Config>
-  <Config Name="CRAFT_HOST_DATA_DIR" Target="CRAFT_HOST_DATA_DIR" Default="/mnt/user/appdata/craft-host/data" Mode="" Description="For doctor only: host path of App data" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/craft-host/data</Config>
-  <Config Name="CRAFT_HOST_STATE_DIR" Target="CRAFT_HOST_STATE_DIR" Default="/mnt/user/appdata/craft-host/state" Mode="" Description="For doctor only: host path of State" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/craft-host/state</Config>
-  <Config Name="CRAFT_HOST_CACHE_DIR" Target="CRAFT_HOST_CACHE_DIR" Default="/mnt/user/appdata/craft-host/cache" Mode="" Description="For doctor only: host path of Cache" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/craft-host/cache</Config>
-  <Config Name="CRAFT_HOST_WORK_DIR" Target="CRAFT_HOST_WORK_DIR" Default="/mnt/user/appdata/craft-host/work" Mode="" Description="For doctor only: host path of Work" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/craft-host/work</Config>
+  <Config Name="CRAFT_HOST_CONFIG_DIR" Target="CRAFT_HOST_CONFIG_DIR" Default="/mnt/user/appdata/artcraft-web-launcher/config" Mode="" Description="For doctor only: host path of Configuration" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/artcraft-web-launcher/config</Config>
+  <Config Name="CRAFT_HOST_DATA_DIR" Target="CRAFT_HOST_DATA_DIR" Default="/mnt/user/appdata/artcraft-web-launcher/data" Mode="" Description="For doctor only: host path of App data" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/artcraft-web-launcher/data</Config>
+  <Config Name="CRAFT_HOST_STATE_DIR" Target="CRAFT_HOST_STATE_DIR" Default="/mnt/user/appdata/artcraft-web-launcher/state" Mode="" Description="For doctor only: host path of State" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/artcraft-web-launcher/state</Config>
+  <Config Name="CRAFT_HOST_CACHE_DIR" Target="CRAFT_HOST_CACHE_DIR" Default="/mnt/user/appdata/artcraft-web-launcher/cache" Mode="" Description="For doctor only: host path of Cache" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/artcraft-web-launcher/cache</Config>
+  <Config Name="CRAFT_HOST_WORK_DIR" Target="CRAFT_HOST_WORK_DIR" Default="/mnt/user/appdata/artcraft-web-launcher/work" Mode="" Description="For doctor only: host path of Work" Type="Variable" Display="advanced" Required="false" Mask="false">/mnt/user/appdata/artcraft-web-launcher/work</Config>
 </Container>

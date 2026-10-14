@@ -1,4 +1,4 @@
-# Craft Apps Host configuration. Copy to CONFIG_DIR/config.toml.
+# ArtCraft Web Launcher configuration. Copy to CONFIG_DIR/config.toml.
 # Global settings and built-in app overrides are optional; new apps need at least a name.
 # Values shown below are defaults. Unknown keys are rejected.
 # Sizes accept bytes or units ("512MiB", "2GiB"); durations accept seconds or "30s"/"15m"/"1h"/"1d".

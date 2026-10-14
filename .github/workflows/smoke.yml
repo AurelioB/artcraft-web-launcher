@@ -1,6 +1,6 @@
 name: Smoke test published image
 
-# Pulls a published tag from GHCR and runs it the way the README describes: non-root user,
+# Pulls a published tag from GHCR and runs it the way the docs describe: non-root user,
 # read-only root, bind mounts, then checks /healthz and the launcher (amd64) and --version (arm64).
 on:
   workflow_dispatch:
@@ -22,7 +22,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     env:
-      IMAGE: ghcr.io/aureliob/craft-host:${{ inputs.tag || 'edge' }}
+      IMAGE: ghcr.io/aureliob/artcraft-web-launcher:${{ inputs.tag || 'edge' }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -35,12 +35,12 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Image tags for a tag release
         if: github.event_name == 'workflow_run' && startsWith(github.event.workflow_run.head_branch, 'v')
-        run: echo "IMAGE=ghcr.io/aureliob/craft-host:${GITHUB_REF_NAME_OVERRIDE#v}" >> "$GITHUB_ENV"
+        run: echo "IMAGE=ghcr.io/aureliob/artcraft-web-launcher:${GITHUB_REF_NAME_OVERRIDE#v}" >> "$GITHUB_ENV"
         env:
           GITHUB_REF_NAME_OVERRIDE: ${{ github.event.workflow_run.head_branch }}
       - name: Inspect manifest
         run: docker buildx imagetools inspect "$IMAGE"
-      - name: Run as in the README (amd64)
+      - name: Run as in docs/install.md (amd64)
         run: |
           base=$(mktemp -d)
           mkdir -p "$base"/{config,data,state,cache,work}

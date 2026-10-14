@@ -1,4 +1,4 @@
-# Craft Apps Host. Configure through .env (copy .env.example); see README.md and docs/.
+# ArtCraft Web Launcher. Configure through .env (copy .env.example); see README.md and docs/.
 #
 # One service: a single static binary that serves the apps under /<app>/, keeps them updated
 # from their official GitHub releases in the background, and offers /admin.
@@ -9,7 +9,7 @@ name: craft-apps
 services:
   host:
     build: ./host
-    image: ${IMAGE:-ghcr.io/aureliob/craft-host:latest}
+    image: ${IMAGE:-ghcr.io/aureliob/artcraft-web-launcher:latest}
     init: true
     read_only: true
     cap_drop: [ALL]

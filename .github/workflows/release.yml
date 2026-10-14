@@ -14,6 +14,9 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: ${{ github.ref == 'refs/heads/main' }}
 
+env:
+  IMAGE_NAME: ghcr.io/aureliob/artcraft-web-launcher
+
 jobs:
   # Nothing is published unless the exact source passes formatting, lints and tests.
   verify:
@@ -64,15 +67,15 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/aureliob/craft-host
+          images: ${{ env.IMAGE_NAME }}
           flavor: latest=false
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=edge,enable=${{ github.ref == 'refs/heads/main' }}
           labels: |
-            org.opencontainers.image.title=Craft Apps Host
-            org.opencontainers.image.description=Self-hosted Craft browser apps and update service
-            org.opencontainers.image.source=https://github.com/AurelioB/craft-server
+            org.opencontainers.image.title=ArtCraft Web Launcher
+            org.opencontainers.image.description=Self-hosted Craft browser apps with a launcher and automatic updates
+            org.opencontainers.image.source=https://github.com/AurelioB/artcraft-web-launcher
       - name: Build and push by digest
         id: build
         uses: docker/build-push-action@v6
@@ -81,7 +84,7 @@ jobs:
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: VERSION=${{ steps.meta.outputs.version }}
-          outputs: type=image,name=ghcr.io/aureliob/craft-host,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.IMAGE_NAME }},push-by-digest=true,name-canonical=true,push=true
           cache-from: type=gha,scope=image-${{ matrix.platform }}
           cache-to: type=gha,scope=image-${{ matrix.platform }},mode=max
       # The runner's own architecture: the image must start and report the crate version.
@@ -89,7 +92,7 @@ jobs:
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
         run: |
-          out=$(docker run --rm "ghcr.io/aureliob/craft-host@$DIGEST" --version)
+          out=$(docker run --rm "$IMAGE_NAME@$DIGEST" --version)
           echo "$out"
           crate=$(sed -n 's/^version = "\(.*\)"/\1/p' host/Cargo.toml | head -n1)
           test "$out" = "craft-host $crate"
@@ -127,7 +130,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/aureliob/craft-host
+          images: ${{ env.IMAGE_NAME }}
           # Shared tags (X.Y, latest) are promoted separately, see below.
           flavor: latest=false
           tags: |
@@ -140,7 +143,7 @@ jobs:
         run: |
           args=()
           while read -r tag; do [ -n "$tag" ] && args+=(-t "$tag"); done <<<"$TAGS"
-          for digest in *; do args+=("ghcr.io/aureliob/craft-host@sha256:$digest"); done
+          for digest in *; do args+=("$IMAGE_NAME@sha256:$digest"); done
           docker buildx imagetools create "${args[@]}"
           docker buildx imagetools inspect "$(head -n1 <<<"$TAGS")"
       # Releases can finish out of order (two tags pushed close together). Point X.Y and latest
@@ -154,7 +157,7 @@ jobs:
           case "$this" in *-*) echo "pre-release $this: shared tags unchanged"; exit 0 ;; esac
           stable() { git tag -l "$1" | sed 's/^v//' | grep -v -- - | sort -V | tail -n1; }
           minor="${this%.*}"
-          image=ghcr.io/aureliob/craft-host
+          image=$IMAGE_NAME
           tags=()
           if [ "$this" = "$(stable "v$minor.*")" ]; then tags+=(-t "$image:$minor"); fi
           if [ "$this" = "$(stable 'v*.*.*')" ]; then tags+=(-t "$image:latest"); fi

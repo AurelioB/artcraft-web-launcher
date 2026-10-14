@@ -1,4 +1,4 @@
-# Craft Apps Host: build a static musl binary for the requested platform.
+# ArtCraft Web Launcher: build a static musl binary for the requested platform.
 ARG VERSION=0.1.0
 FROM rust:1.99-alpine AS build
 RUN apk add --no-cache gcc musl-dev
@@ -14,9 +14,9 @@ COPY --from=build /src/target/release/craft-host /craft-host
 
 FROM gcr.io/distroless/static-debian12:nonroot
 ARG VERSION
-LABEL org.opencontainers.image.title="Craft Apps Host" \
-      org.opencontainers.image.description="Self-hosted Craft browser apps and update service" \
-      org.opencontainers.image.source="https://github.com/AurelioB/craft-server" \
+LABEL org.opencontainers.image.title="ArtCraft Web Launcher" \
+      org.opencontainers.image.description="Self-hosted Craft browser apps with a launcher and automatic updates" \
+      org.opencontainers.image.source="https://github.com/AurelioB/artcraft-web-launcher" \
       org.opencontainers.image.version="${VERSION}"
 COPY --from=build /src/target/release/craft-host /usr/local/bin/craft-host
 # Compose sets the real identity (user:) and umask (FILE_UMASK).

@@ -135,7 +135,9 @@ pub fn denied_page(s: &Shared, d: Denied, path: &str, query: Option<&str>) -> Re
             let mut r = simple(StatusCode::UNAUTHORIZED, "authentication required\n");
             r.headers_mut().insert(
                 header::WWW_AUTHENTICATE,
-                HeaderValue::from_static("Basic realm=\"Craft Apps\", charset=\"UTF-8\""),
+                HeaderValue::from_static(
+                    "Basic realm=\"ArtCraft Web Launcher\", charset=\"UTF-8\"",
+                ),
             );
             r
         }
