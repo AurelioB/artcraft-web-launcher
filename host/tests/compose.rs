@@ -306,17 +306,13 @@ enabled = true
 name = "TestCraft"
 repository = "storytold/testcraft"
 artifact_patterns = ["testcraft-web-{version}.zip"]
+[discovery]
+feed_url = ""
 "#,
     );
-    for id in [
-        "photocraft",
-        "vectorcraft",
-        "filmcraft",
-        "lightcraft",
-        "pdfcraft",
-        "effectcraft",
-        "designcraft",
-    ] {
+    // Only TestCraft: every built-in app is off, and nothing is discovered.
+    let manifest: toml::Table = toml::from_str(craft_host::config::MANIFEST).unwrap();
+    for id in manifest["apps"].as_table().unwrap().keys() {
         cfg.push_str(&format!("[apps.{id}]\nenabled = false\n"));
     }
     fs::write(base.join("config/config.toml"), cfg).unwrap();
@@ -370,7 +366,7 @@ fn compose_stack_end_to_end() {
     assert_eq!(s.served(), "1.0.0");
     assert_eq!(s.get("/testcraft/1.0.0/version.txt").body, "1.0.0");
     assert_eq!(s.get("/testcraft/1.0.0/.craft-release.json").status, 404);
-    assert!(s.get("/").body.contains("Craft Apps"));
+    assert!(s.get("/").body.contains("ArtCraft Web Launcher"));
     let status: serde_json::Value = serde_json::from_str(&s.get("/status.json").body).unwrap();
     assert_eq!(status["apps"][0]["state"], "ready");
 
