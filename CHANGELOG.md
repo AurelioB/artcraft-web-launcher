@@ -1,7 +1,27 @@
 # Changelog
 
-All notable changes to Craft Apps Host are documented here. This project follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
+This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+## [0.4.0] - 2026-10-14
+
+### Changed
+
+- Renamed to **ArtCraft Web Launcher**: the launcher header, page titles and sign-in realm, the
+  repository (now `AurelioB/artcraft-web-launcher`; the old URL redirects) and the container
+  image, now published as `ghcr.io/aureliob/artcraft-web-launcher`. The binary (`craft-host`),
+  its environment variables, `config.toml`, the Compose service and the data layout are
+  unchanged.
+- The Unraid template is `unraid/artcraft-web-launcher.xml`, with the container and appdata
+  directory named `artcraft-web-launcher` for new installations.
+- README rewritten; installation details (Unraid, `docker run`, standalone binary) moved to
+  `docs/install.md`. The original design plan is removed from the documentation.
+
+### Upgrading
+
+- `ghcr.io/aureliob/craft-host` receives no further releases. If `.env` sets `IMAGE`, change it
+  to `ghcr.io/aureliob/artcraft-web-launcher` with the same tag; the default already uses the new
+  name. On Unraid, change only the container's **Repository** and keep its paths.
 
 ## [0.3.1] - 2026-10-13
 
@@ -129,12 +149,13 @@ All notable changes to Craft Apps Host are documented here. This project follows
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
-[0.3.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.3.1
-[0.3.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.3.0
-[0.2.4]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.4
-[0.2.3]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.3
-[0.2.2]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.2
-[0.2.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.1
-[0.2.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.2.0
-[0.1.1]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.1
-[0.1.0]: https://github.com/AurelioB/craft-server/releases/tag/v0.1.0
+[0.4.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.4.0
+[0.3.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.3.1
+[0.3.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.3.0
+[0.2.4]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.2.4
+[0.2.3]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.2.3
+[0.2.2]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.2.2
+[0.2.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.2.1
+[0.2.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.2.0
+[0.1.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.1.1
+[0.1.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.1.0

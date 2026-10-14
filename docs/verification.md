@@ -18,9 +18,9 @@ serving checks do not guarantee that every upstream editing function works.
 
 ## Live deployment against GitHub
 
-The previous two-service deployment (directories under a path with a space, `RUN_UID=1000`,
-`RUN_GID=10000`, `FILE_UMASK=0002`, setgid directories) was upgraded in place following
-[install.md](install.md#from-the-two-service-layout-web--updater):
+An earlier two-service deployment of the project (directories under a path with a space,
+`RUN_UID=1000`, `RUN_GID=10000`, `FILE_UMASK=0002`, setgid directories) was upgraded in place to
+the single binary:
 
 - All existing releases and state carried over; the server answered immediately and added
   precompressed copies to the seven existing releases in the background (about 40 s in total,
@@ -209,3 +209,12 @@ With the debug binary against a local site that gzips whenever asked:
 - In `/admin` (headless Chromium) the Apps heading showed "ArtCraft feed read <time>, daily".
   Refresh app info ran as an admin action ("feed read; new apps: none; pages read: gzcraft")
   and sent exactly the feed, page and logo requests.
+
+## 0.4.0 (14 October 2026): ArtCraft Web Launcher
+
+`cargo test` (unit 56, lifecycle 17, HTTP/admin 15) and the Docker Compose end-to-end test
+(`cargo test --test compose -- --ignored`, image built from source, Docker 29.9) passed, with
+`cargo clippy --all-targets -- -D warnings` clean. The Compose test had left the six apps added in
+0.2.0, and discovery, enabled against its fake GitHub; it now turns off every built-in app and
+discovery. With all thirteen apps installed, the launcher (headless Chromium) shows "ArtCraft Web
+Launcher" in its header and title; that view is the README screenshot.
