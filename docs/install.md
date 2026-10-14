@@ -225,9 +225,10 @@ Installed releases, state and cache are kept. With a standalone binary, replace 
 the service.
 
 Up to 0.3, the image was published as `ghcr.io/aureliob/craft-host`. That name gets no further
-updates: if `.env` sets `IMAGE`, change it to `ghcr.io/aureliob/artcraft-web-launcher` with the
-same tag. On Unraid, edit the existing container and change **Repository** only; keep its paths so
-it continues with the same data.
+updates, and the new name starts at 0.4.0: if `.env` sets `IMAGE`, change it to
+`ghcr.io/aureliob/artcraft-web-launcher` with `latest`, `0.4` or a later tag. On Unraid, edit the
+existing container and set **Repository** to `ghcr.io/aureliob/artcraft-web-launcher:latest`;
+keep its paths so it continues with the same data.
 
 Configurations with older sign-in settings (`[auth] method`, `users_file`, or `[admin] auth`, …)
 are rejected with a message per moved key; see

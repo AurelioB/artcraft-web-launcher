@@ -19,9 +19,10 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Upgrading
 
-- `ghcr.io/aureliob/craft-host` receives no further releases. If `.env` sets `IMAGE`, change it
-  to `ghcr.io/aureliob/artcraft-web-launcher` with the same tag; the default already uses the new
-  name. On Unraid, change only the container's **Repository** and keep its paths.
+- `ghcr.io/aureliob/craft-host` receives no further releases, and the new name starts at 0.4.0.
+  If `.env` sets `IMAGE`, change it to `ghcr.io/aureliob/artcraft-web-launcher` with `latest`,
+  `0.4` or a later tag; the default already uses the new name. On Unraid, change only the
+  container's **Repository** and keep its paths.
 
 ## [0.3.1] - 2026-10-13
 
