@@ -65,6 +65,13 @@ does not take over tabs of an older one. On activation it deletes caches of othe
 versions; tabs still on an older release fall back to the network, which keeps serving retained
 releases.
 
+## Optional server projects
+
+The disabled-by-default [document store](cloud-storage.md) separates server projects by signed-in
+account. It does not grant applications access to arbitrary server folders. Native Save and
+server Recents need the documented editor bridge; official builds without it keep their normal
+local behaviour. The server option does not migrate or isolate existing browser storage.
+
 ## Browser storage
 
 All apps on one host share an origin. Observed on 8 October after using the seven classic apps

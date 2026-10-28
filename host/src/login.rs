@@ -352,6 +352,26 @@ pub async fn logout(
             serde_json::json!({ "error": "cross-site request" }),
         );
     }
+    // The cloud client may have captured its action before another tab changed accounts.
+    // Existing callers without this optional guard retain their normal sign-out behaviour.
+    if let Some(expected) = headers.get("x-craft-cloud-namespace") {
+        let matches = expected
+            .to_str()
+            .ok()
+            .and_then(|expected| {
+                authenticate(&s, &headers, &c)
+                    .ok()
+                    .and_then(|p| crate::cloud::principal_namespace(&p))
+                    .map(|actual| actual == expected)
+            })
+            .unwrap_or(false);
+        if !matches {
+            return json(
+                StatusCode::CONFLICT,
+                serde_json::json!({ "error": "identity_changed" }),
+            );
+        }
+    }
     if let Some(t) = cookie(&headers, SESSION_COOKIE) {
         s.sessions.remove(&t);
     }

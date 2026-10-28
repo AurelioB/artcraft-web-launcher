@@ -181,12 +181,20 @@ storage, serve it under its own host name, which is a separate origin:
 The launcher then links to `https://lightcraft.example.net/lightcraft/`. This changes links, not
 routing; restrict the shared host in the proxy if the app must not be used there.
 
+## Optional document store
+
+With `[cloud] enabled`, `STATE_DIR/cloud/` also contains private document blobs, a SQLite
+catalog and resumable uploads. These files are user data, not release caches. Never apply app
+release retention or cache cleanup to that directory. Stop the server and back up the entire
+directory together with account state; copying only the catalog omits the documents. See
+[document storage](cloud-storage.md#storage-and-backups) for account identity and recovery limits.
+
 ## Backup
 
 | Directory | Back up? | Notes |
 | --- | --- | --- |
 | `CONFIG_DIR` | yes | configuration, token, OIDC secret (protect the backup) |
-| `STATE_DIR` | yes | pins, blocks, pending, history, accounts (`users.sqlite3`: protect the backup); small. Copy the database while the server is stopped, or with `sqlite3 users.sqlite3 ".backup copy.sqlite3"` |
+| `STATE_DIR` | yes | pins, blocks, pending, history and accounts (`users.sqlite3`); also private documents and their catalog when cloud storage is enabled. Protect the backup and stop the server for a consistent copy of account state and documents; see [document storage](cloud-storage.md#storage-and-backups). |
 | `DATA_DIR` | optional | releases can be re-downloaded, but old versions may disappear upstream; back up to keep the ability to roll back |
 | `CACHE_DIR`, `WORK_DIR` | no | reproducible |
 

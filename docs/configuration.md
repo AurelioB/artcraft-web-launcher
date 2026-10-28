@@ -13,6 +13,18 @@ ArtCraft Web Launcher (the `craft-host` binary) combines its compiled-in [app ma
 | `listen` | string; `"0.0.0.0:8080"` | TCP socket address (`IP:port`; bracket IPv6 literals), on the container's network. Compose publishes container port 8080. |
 | `trusted_proxies` | string list; `[]` | IPv4/IPv6 addresses or CIDR networks whose forwarding and proxy-auth headers are trusted. Bare addresses match one host; CIDR prefixes must fit the address family. Only trusted peers' `X-Forwarded-Proto` (HTTPS/Secure-cookie detection), `X-Forwarded-Host` and configured identity headers are honored. Required nonempty for proxy sign-in. Set this to the actual proxy network, not arbitrary clients. |
 
+## `[cloud]`
+
+| Key | Type; default | Meaning and validation |
+| --- | --- | --- |
+| `enabled` | bool; `false` | Enables the complete server document feature: storage API, floating panel and native editor bridge. Requires a sign-in method and `[auth] apps = "signed-in"`. Restart to apply. False does not initialize document storage or inject the client. |
+| `max_file` | size; `"1GiB"` | Positive maximum document size, no greater than quota or 1TiB. Chunks are 4MiB. |
+| `quota` | size; `"10GiB"` | Positive global data budget across all accounts, versions, pending upload reservations and orphan files; at most 1PiB. SQLite metadata is not included. |
+
+There is no end-user cloud switch. Disabling the feature preserves existing documents and local
+editor data. The [bridge contract and limitations](cloud-storage.md) describe compatible apps,
+user isolation, backups and changing accounts on a shared browser.
+
 ## `[updater]`
 
 | Key | Type; default | Meaning and validation |
