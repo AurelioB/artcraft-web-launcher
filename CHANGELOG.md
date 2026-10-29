@@ -3,6 +3,29 @@
 All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.0] - 2026-10-29
+
+### Added
+
+- **SolidCraft**, the community app ArtCraft Launcher 0.10.0 added to its catalogue, is built in:
+  it installs from `tangency-labs/solidcraft` like the suite apps (`solidcraft-web-<v>.zip`,
+  checked against `SHA256SUMS.txt`) and serves at `/solidcraft/`. The ArtCraft release feed does
+  not list it, so discovery could not find it.
+- The launcher shows who makes each catalogue app, as ArtCraft Launcher does: "by ArtCraft" for
+  official apps, "by Tangency Labs" in muted text for community apps.
+
+### Changed
+
+- Discovery accepts apps from any GitHub account, not only `storytold`: a feed entry becomes an
+  app when its latest release has a `<id>-web-<version>.zip` archive. A discovered app keeps the
+  repository it was first found with; ArtCraft Launcher's own entry is never an app.
+- The vendored ArtCraft Launcher catalogue and translations are refreshed to upstream
+  `c1d0d88` (PdfCraft's red brand colour, FigCraft and SoundCraft earlier in the suite order).
+  `status.json` replaces each app's `group` ("classic"/"new", dropped upstream) with `kind`
+  ("official" or "community") and `publisher`.
+- Built-in logos may be PNG; SolidCraft's is the icon ArtCraft Launcher embeds, served with its
+  MIT and Apache-2.0 licences under `/launcher/icons/`.
+
 ## [0.4.0] - 2026-10-14
 
 ### Changed
@@ -150,6 +173,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.5.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.0
 [0.4.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.4.0
 [0.3.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.3.1
 [0.3.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.3.0
