@@ -1,6 +1,7 @@
-//! Launcher assets compiled into the binary: pages, script, styles, the official app logos, the
-//! fonts used by https://getartcraft.com (Archivo and Geist Mono, SIL Open Font License) and the
-//! catalogue and translations vendored from ArtCraft Launcher (MIT OR Apache-2.0).
+//! Launcher assets compiled into the binary: pages, script, styles, the app logos (official
+//! apps' from getartcraft.com, a community app's from ArtCraft Launcher with its own licence),
+//! the fonts used by https://getartcraft.com (Archivo and Geist Mono, SIL Open Font License) and
+//! the catalogue and translations vendored from ArtCraft Launcher (MIT OR Apache-2.0).
 
 pub struct Asset {
     pub bytes: &'static [u8],
@@ -107,6 +108,24 @@ const LAUNCHER: &[(&str, Asset)] = &[
         asset!("icons/figcraft.webp", "image/webp"),
     ),
     (
+        "icons/solidcraft.png",
+        asset!("icons/solidcraft.png", "image/png"),
+    ),
+    (
+        "icons/LICENSE-MIT-SolidCraft.txt",
+        asset!(
+            "icons/LICENSE-MIT-SolidCraft.txt",
+            "text/plain; charset=utf-8"
+        ),
+    ),
+    (
+        "icons/LICENSE-APACHE-SolidCraft.txt",
+        asset!(
+            "icons/LICENSE-APACHE-SolidCraft.txt",
+            "text/plain; charset=utf-8"
+        ),
+    ),
+    (
         "catalog.json",
         asset!("vendor/craft-launcher/catalog.json", "application/json"),
     ),
@@ -149,10 +168,14 @@ pub fn launcher(path: &str) -> Option<&'static Asset> {
     LAUNCHER.iter().find(|(p, _)| *p == path).map(|(_, a)| a)
 }
 
-/// Launcher URL (relative to the site root) of the official logo for a built-in app.
+/// Launcher URL (relative to the site root) of the logo for a built-in app: the WebP from
+/// getartcraft.com, else the PNG ArtCraft Launcher embeds.
 pub fn logo(app_id: &str) -> Option<String> {
-    let path = format!("icons/{app_id}.webp");
-    launcher(&path).map(|_| format!("launcher/{path}"))
+    ["webp", "png"]
+        .iter()
+        .map(|ext| format!("icons/{app_id}.{ext}"))
+        .find(|path| launcher(path).is_some())
+        .map(|path| format!("launcher/{path}"))
 }
 
 #[cfg(test)]
@@ -165,7 +188,16 @@ mod tests {
         for id in manifest["apps"].as_table().unwrap().keys() {
             let url = logo(id).unwrap_or_else(|| panic!("no logo for {id}"));
             let asset = launcher(url.strip_prefix("launcher/").unwrap()).unwrap();
-            assert!(asset.bytes.starts_with(b"RIFF"), "{id} logo is WebP");
+            let png = asset.bytes.starts_with(b"\x89PNG\r\n\x1a\n");
+            assert!(
+                asset.bytes.starts_with(b"RIFF") || png,
+                "{id} logo is WebP or PNG"
+            );
+            assert_eq!(
+                png,
+                url.ends_with(".png"),
+                "{id} logo type matches its name"
+            );
         }
         assert!(logo("examplecraft").is_none());
     }

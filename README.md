@@ -14,8 +14,9 @@ bridges; this option does not add those hooks to official release binaries.
 ## Features
 
 - **The whole suite**: PhotoCraft, VectorCraft, FilmCraft, LightCraft, PdfCraft, EffectCraft,
-  DesignCraft, WordCraft, DeckCraft, GridCraft, CADCraft, SoundCraft and FigCraft. Apps released
-  later are discovered from the ArtCraft release feed and installed automatically.
+  DesignCraft, WordCraft, DeckCraft, GridCraft, CADCraft, SoundCraft and FigCraft, plus the
+  community app SolidCraft from ArtCraft Launcher's catalogue. Apps released later are discovered
+  from the ArtCraft release feed, whoever publishes them, and installed automatically.
 - **Launcher** at `/`, styled after ArtCraft Launcher: grid and table views, app pages with
   screenshots, and the launcher's translations.
 - **Verified updates**: every release is checked against its checksum and validated before it

@@ -91,10 +91,19 @@ function tagline(app) {
     ? t(app.tagline, {}, app.id)
     : app.tagline;
 }
+// Who makes an app, as ArtCraft Launcher shows it: "by ArtCraft" in the app's color for official
+// apps, "by <publisher>" in muted text for community apps. Apps outside the catalogue have none.
+function byline(app) {
+  if (typeof app.publisher !== "string" || !app.publisher) return null;
+  const kind = app.kind === "community" ? "community" : "official";
+  return el("p", { class: `byline ${kind}` }, t("by {name}", { name: app.publisher }));
+}
 function identity(app, heading = "h2") {
   const node = el("div", { class: "identity" });
   const text = el("div", { class: "identity-text" });
   text.append(title(app, heading), el("p", { class: "tagline" }, tagline(app)));
+  const by = byline(app);
+  if (by) text.append(by);
   node.append(logo(app), text);
   return node;
 }

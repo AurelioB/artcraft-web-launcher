@@ -4,12 +4,15 @@
 # Every app listed here is installed and kept up to date unless an operator disables it. The
 # defaults follow the Craft App Suite's conventions, so a new app usually needs only its section:
 #
-# - name, tagline, brand colors, suite group and product page come from the ArtCraft Launcher
-#   catalogue vendored in host/assets/vendor/craft-launcher (scripts/sync-craft-launcher.py);
-# - repository = the catalogue's, else "storytold/<id>";
+# - name, tagline, brand colors, publisher (official or community) and product page come from
+#   the ArtCraft Launcher catalogue vendored in host/assets/vendor/craft-launcher
+#   (scripts/sync-craft-launcher.py);
+# - repository = the catalogue's (a community app's own, e.g. tangency-labs/solidcraft), else
+#   "storytold/<id>";
 # - artifact_patterns = "<id>-web-{version}.zip", plus the same for each former id in the
 #   catalogue (PdfCraft shipped printcraft-web-<v>.zip up to v0.2.1);
-# - the launcher logo is host/assets/icons/<id>.webp (getartcraft.com/images/apps/<id>/icon.webp).
+# - the launcher logo is host/assets/icons/<id>.webp (getartcraft.com/images/apps/<id>/icon.webp),
+#   or <id>.png for a community app without a page there (the icon ArtCraft Launcher embeds).
 #
 # Every official release surveyed on 2026-10-12 ships `<id>-web-<version>.zip` holding one
 # top-level directory with a static site whose index.html uses relative URLs only, plus
@@ -60,3 +63,6 @@ notes = "Content-hashed asset names. WebGPU needs a secure context; falls back t
 notes = "Plays audio through WebAudio; no cross-origin isolation headers needed."
 
 [apps.figcraft]
+
+[apps.solidcraft]
+notes = "Community app by Tangency Labs (tangency-labs/solidcraft), in the ArtCraft Launcher catalogue since 0.10.0. Ships a service worker (sw.js)."

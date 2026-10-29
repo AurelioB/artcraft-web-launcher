@@ -195,14 +195,15 @@ pub struct AppConfig {
     pub exclude: Vec<String>,
     pub icon: String,
     pub notes: String,
-    /// Launcher metadata: short category, one-line description, brand color (#rrggbb), the
-    /// suite group ("classic", "new", or empty), the product page and the colors for text on
-    /// light and dark backgrounds (#rrggbb or empty). Built-in apps take them from the vendored
-    /// ArtCraft Launcher catalogue.
+    /// Launcher metadata: short category, one-line description, brand color (#rrggbb), who
+    /// makes it (kind "official" or "community", and the publisher; empty outside the Craft App
+    /// catalogue), the product page and the colors for text on light and dark backgrounds
+    /// (#rrggbb or empty). Built-in apps take them from the vendored ArtCraft Launcher catalogue.
     pub category: String,
     pub tagline: String,
     pub color: String,
-    pub group: String,
+    pub kind: String,
+    pub publisher: String,
     pub website: String,
     pub ink_light: String,
     pub ink_dark: String,
@@ -680,6 +681,16 @@ fn parse_activation(
     }
 }
 
+/// A GitHub `owner/name`: both sides nonempty ASCII letters, digits, `_`, `.` or `-`.
+pub fn valid_repository(repository: &str) -> bool {
+    let part = |p: &str| {
+        !p.is_empty()
+            && p.bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'_' | b'.' | b'-'))
+    };
+    matches!(repository.split_once('/'), Some((owner, name)) if part(owner) && part(name))
+}
+
 fn build_app(
     id: &str,
     raw: RawApp,
@@ -701,8 +712,7 @@ fn build_app(
     let repository = raw
         .repository
         .unwrap_or_else(|| cat.map_or_else(|| format!("storytold/{id}"), |c| c.repository.clone()));
-    let repo_re = Regex::new(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$").unwrap();
-    if !repo_re.is_match(&repository) {
+    if !valid_repository(&repository) {
         problems.push(format!(
             "{}: expected \"owner/name\", got {repository:?}",
             w("repository")
@@ -857,7 +867,8 @@ fn build_app(
         } else {
             color
         },
-        group: presentation(None, |c| &c.group),
+        kind: presentation(None, |c| &c.kind),
+        publisher: presentation(None, |c| &c.publisher),
         website: presentation(None, |c| &c.website),
         ink_light: presentation(None, |c| &c.ink_light),
         ink_dark: presentation(None, |c| &c.ink_dark),
@@ -1474,10 +1485,28 @@ mod tests {
                 "gridcraft",
                 "cadcraft",
                 "soundcraft",
-                "figcraft"
+                "figcraft",
+                "solidcraft"
             ]
         );
-        assert_eq!(cfg.enabled_apps().count(), 13);
+        assert_eq!(cfg.enabled_apps().count(), 14);
+        // A community app installs from its publisher's repository with the suite's naming.
+        let solid = cfg.app("solidcraft").unwrap();
+        assert_eq!(
+            (
+                solid.repository.as_str(),
+                solid.kind.as_str(),
+                solid.publisher.as_str(),
+                solid.website.as_str()
+            ),
+            (
+                "tangency-labs/solidcraft",
+                "community",
+                "Tangency Labs",
+                "https://solidcraft.io"
+            )
+        );
+        assert_eq!(solid.artifact_patterns, ["solidcraft-web-{version}.zip"]);
         let pdf = cfg.app("pdfcraft").unwrap();
         assert_eq!(pdf.repository, "storytold/pdfcraft");
         assert_eq!(
@@ -1487,21 +1516,17 @@ mod tests {
         assert_eq!(pdf.release_dir, "releases/pdfcraft");
         assert_eq!(pdf.tagline, "Reading, organizing and protecting PDFs");
         assert_eq!(
-            (
-                pdf.group.as_str(),
-                pdf.color.as_str(),
-                pdf.ink_dark.as_str()
-            ),
-            ("classic", "#12a58a", "#3fd6b8")
+            (pdf.kind.as_str(), pdf.color.as_str(), pdf.ink_dark.as_str()),
+            ("official", "#e8204f", "#f23a62")
         );
         let word = cfg.app("wordcraft").unwrap();
         assert_eq!(
             (
                 word.name.as_str(),
                 word.repository.as_str(),
-                word.group.as_str()
+                word.publisher.as_str()
             ),
-            ("WordCraft", "storytold/wordcraft", "new")
+            ("WordCraft", "storytold/wordcraft", "ArtCraft")
         );
         assert_eq!(word.artifact_patterns, ["wordcraft-web-{version}.zip"]);
         assert_eq!(word.website, "https://getartcraft.com/apps/wordcraft");
@@ -1732,9 +1757,10 @@ entry = "effectcraft"
             (
                 app.repository.as_str(),
                 app.entry.as_str(),
-                app.group.as_str()
+                app.kind.as_str(),
+                app.publisher.as_str()
             ),
-            ("storytold/newcraft", "newcraft", "")
+            ("storytold/newcraft", "newcraft", "", "")
         );
         assert_eq!(app.artifact_patterns, ["newcraft-web-{version}.zip"]);
         let cfg = load(
