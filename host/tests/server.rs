@@ -1876,6 +1876,16 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         )
         .into_bytes()
     };
+    // The feed now names another repository for it; the discovered app keeps its own.
+    gh.put_route(
+        "/feed.json",
+        feed(&[
+            ("newcraft", "storytold/newcraft", "Newcraft"),
+            ("clashcraft", "storytold/clashcraft", "ClashCraft"),
+            ("testcraft", "storytold/testcraft", "Feed TestCraft"),
+            ("artcraft-launcher", "storytold/craft-launcher", "Launcher"),
+        ]),
+    );
     gh.put_route("/apps/newcraft", page("Everything about NewCraft.", ""));
     let refresh_url = format!("{u}/admin/api/discovery/refresh");
     assert_eq!(request("POST", &refresh_url, &[], None).status, 401);
@@ -1910,6 +1920,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     assert_eq!(app["headline"], "NewCraft: Draw & paint.");
     assert_eq!(app["description"], "Everything about NewCraft.");
     assert_eq!(app["website"], format!("{g}/apps/newcraft"));
+    assert_eq!(app["repository"], "tangency-labs/newcraft");
     assert_eq!(app["icon"], "launcher/discovered/newcraft.webp");
     assert_eq!(
         app["screenshots"],
@@ -2044,8 +2055,12 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     let app = restarted.app("newcraft").unwrap();
     assert!(app.discovered);
     assert_eq!(
-        (app.name.as_str(), app.logo.as_deref()),
-        ("NewCraft", Some("newcraft.png"))
+        (
+            app.name.as_str(),
+            app.logo.as_deref(),
+            app.repository.as_str()
+        ),
+        ("NewCraft", Some("newcraft.png"), "tangency-labs/newcraft")
     );
     assert!(restarted.app("clashcraft").is_err());
 
