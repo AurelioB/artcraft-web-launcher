@@ -144,9 +144,46 @@ capture uploads must keep the later revision dirty; a closed or retired request 
 late ACKs. `download`, `failed` and `cancel` are distinct outcomes. The host must not resolve
 a future or different document by reusing a request ID.
 
-This draft needs compatible upstream editor implementations before native Save/Recents can
-be enabled for stock releases. It contains the shared host/client and protocol tests, not
+This contribution needs compatible upstream editor implementations before native Save/Recents
+can be enabled for stock releases. It contains the shared host/client and protocol tests, not
 thirteen silently patched official distributions. That dependency is a review/merge gate.
+
+## Separately validated companion adapters
+
+All thirteen adapted versions below were validated in a separate private desktop-PC
+web deployment. Its canonical native protocol, codec and capture selections passed
+260 cases, with no failures or ignored cases. Browser checks covered server save,
+durable acknowledgement, reload and native server Recents, separate local Recents,
+and physical device copies. These results concern the adapted builds only.
+
+The companion source adaptations and binaries are **not included in this PR**. This
+is not an end-to-end run against this community server or certification of unmodified
+official binaries. This contribution remains the shared optional host/client and
+native bridge protocol 1. Compatible upstream editor implementations remain a
+review/merge dependency. The feature remains disabled by default, with storage scoped
+to the authenticated account when enabled.
+
+| Adapted editor | Version | Checked format and scope limits |
+| --- | --- | --- |
+| PhotoCraft | 0.17.0 | PSD with editable layers and a brush stroke. Other formats and PSD features were not certified. |
+| WordCraft | 0.12.0 | DOCX with text and an embedded image. This does not certify every document feature or import/export format. |
+| GridCraft | 0.13.0 | XLSX with two sheets, a formula and a pending cell edit committed through the visible Save button. A focused cell editor can consume Ctrl+S before the global shortcut. |
+| DeckCraft | 0.12.0 | Native `.deckcraft` with text and an image. PPTX and real-device IME composition were not certified. |
+| VectorCraft | 0.18.0 | Native `.vectorcraft` with an editable rectangle and embedded PNG. The reopened internal tab title can remain `Untitled-1`; other linked resources and external fonts were not certified. |
+| FilmCraft | 0.14.0 | `.fcproj.zip` with PNG/WAV bytes retained and the PNG displayed in Source and Program. Audible playback, waveforms and video were not certified. Local use extracts the ZIP beside its project/assets. |
+| LightCraft | 0.15.0 | Whole-library ZIP with PNG originals and an exposure adjustment. Large libraries and all image formats were not certified. |
+| PdfCraft | 0.15.0 | One-page PDF with five form fields. Images, encryption and signatures were not certified. |
+| EffectCraft | 0.18.0 | `.ecproj.zip` with a restored PNG and renamed layer. Direct local ZIP opening was not certified; the documented desktop route extracts the project/assets. Custom external OCIO configurations remain unsupported by the complete-bundle guard. |
+| DesignCraft | 0.14.0 | Native `.designcraft` with one page and an embedded PNG frame. External fonts and other import/export formats were not certified. |
+| CadCraft | 0.14.0 | DXF with one line and two circles. DWG, XREFs, images and numeric coordinate entry were not certified. |
+| SoundCraft | 0.14.0 | `.scraftz` with a one-second mono WAV and track mute retained. Decoded Float32 samples matched the PCM16 reference exactly. Audible playback, hardware capture and live external plugins were not certified. |
+| FigCraft | 0.12.1 | Native `.figcraft` with two editable rectangles and an embedded PNG. Experimental `.fig` interchange was not certified. |
+
+Local Recents retain each editor's official browser provider. A listed local path
+may require choosing the file again when the browser has no durable file permission.
+The media examples above do not establish completeness for every external dependency.
+Safari/iPad and Apple Pencil Scribble validation remain deferred. The host/client
+development checks below are separate from this adapted-editor deployment evidence.
 
 ## HTTP API
 
