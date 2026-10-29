@@ -21,6 +21,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -29,7 +30,7 @@ REPOSITORY_URL = "https://github.com/" + REPOSITORY
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MAX_ICON_BYTES = 512 * 1024
 PLURAL_RULES = {"one_other", "zero_one", "none", "east_slavic", "czech", "polish"}
-TOKEN = re.compile(r'"(?:\\[\s\S]|[^"\\])*"|[A-Za-z_][A-Za-z_0-9]*|0x[0-9A-Fa-f_]+|[0-9][0-9_]*|::|\.\.|[^\s]')
+TOKEN = re.compile(r'b?"(?:\\[\s\S]|[^"\\])*"|[A-Za-z_][A-Za-z_0-9]*|0x[0-9A-Fa-f_]+|[0-9][0-9_]*|::|\.\.|[^\s]')
 
 
 class ParseError(ValueError):
@@ -110,9 +111,15 @@ def tokenize(path):
             if not match:
                 raise ParseError("unrecognized Rust token")
             value = match[0]
-            if value == '"':
+            if value in ('"', 'b"'):
                 raise ParseError("unterminated Rust string")
-            tokens.append(('string', rust_string(value)) if value.startswith('"') else ('token', value))
+            if value.startswith('b"'):
+                # Byte strings only appear in tests; they are never catalogue data.
+                tokens.append(('bytes', value))
+            elif value.startswith('"'):
+                tokens.append(('string', rust_string(value)))
+            else:
+                tokens.append(('token', value))
             index = match.end()
     return tokens
 
@@ -227,36 +234,108 @@ def count_calls(tokens, name, opener):
                for index in range(len(tokens) - 1))
 
 
+def string_array(tokens):
+    if tokens == [('token', '&'), ('token', '['), ('token', ']')]:
+        return []
+    return [string_value(part) for part in borrowed_array(tokens)]
+
+
+def optional_string(tokens):
+    if tokens == [('token', 'None')]:
+        return None
+    args = call_args(tokens, 'Some')
+    if len(args) != 1:
+        raise ParseError("Some must have one argument")
+    return string_value(args[0])
+
+
+def app_kind(tokens):
+    if len(tokens) != 3 or tokens[:2] != [('token', 'AppKind'), ('token', '::')] or tokens[2][1] not in ('Official', 'Community'):
+        raise ParseError("unsupported app kind")
+    return tokens[2][1].lower()
+
+
+def boolean(tokens):
+    if tokens not in ([('token', 'true')], [('token', 'false')]):
+        raise ParseError("expected a Rust boolean literal")
+    return tokens[0][1] == 'true'
+
+
+# CraftApp fields the catalogue reads (the others are still parsed, so a changed type fails
+# loudly). Their defaults come from the `app(…)` constructor; a SUITE entry may override them.
+APP_FIELDS = {
+    'former_ids': string_array,
+    'former_names': string_array,
+    'kind': app_kind,
+    'publisher': string_value,
+    'msi_publisher': optional_string,
+    'bundle': optional_string,
+    'former_bundles': string_array,
+    'site': optional_string,
+    'installs_on_mac': boolean,
+}
+
+
+def app_defaults(tokens):
+    """The field values `const fn app(…)` gives every app it builds."""
+    index = next((i for i in range(len(tokens) - 1)
+                  if is_token(tokens[i], 'fn') and is_token(tokens[i + 1], 'app')), None)
+    if index is None:
+        raise ParseError("missing const fn app")
+    # The struct literal, not the `-> CraftApp {` that opens the function body.
+    start = next((i for i in range(index, len(tokens) - 1)
+                  if is_token(tokens[i], 'CraftApp') and is_token(tokens[i + 1], '{')
+                  and not is_token(tokens[i - 1], '>')), None)
+    if start is None:
+        raise ParseError("app(…) must build a CraftApp literal")
+    depth, end = 0, start + 1
+    while end < len(tokens):
+        if is_token(tokens[end], '{'):
+            depth += 1
+        elif is_token(tokens[end], '}'):
+            depth -= 1
+            if depth == 0:
+                break
+        end += 1
+    else:
+        raise ParseError("app(…) CraftApp literal is unclosed")
+    defaults = {}
+    for part in split_top(tokens[start + 2:end]):
+        if len(part) >= 3 and part[0][0] == 'token' and is_token(part[1], ':') and part[0][1] in APP_FIELDS:
+            defaults[part[0][1]] = APP_FIELDS[part[0][1]](part[2:])
+    missing = set(APP_FIELDS) - set(defaults)
+    if missing:
+        raise ParseError("app(…) sets no default for: " + ', '.join(sorted(missing)))
+    return defaults
+
+
 def parse_suite(tokens):
+    defaults = app_defaults(tokens)
     body, entries = array_declaration(tokens, 'SUITE')
     apps = []
     for entry in entries:
-        former_ids = []
+        values = dict(defaults)
         if is_token(entry[0], 'CraftApp'):
             parts = split_top(enclosed(entry[1:], '{', '}'))
             if not parts or not is_token(parts[-1][0], '..'):
                 raise ParseError("CraftApp update must end with ..app(…)")
             overrides = fields([token for part in parts[:-1] for token in part + [('token', ',')]])
-            if set(overrides) != {'former_ids', 'former_names'}:
-                raise ParseError("unsupported CraftApp overrides")
-            former_ids = [string_value(part) for part in borrowed_array(overrides['former_ids'])]
-            # Parse former_names as well, although the host contract does not expose them.
-            for part in borrowed_array(overrides['former_names']):
-                string_value(part)
+            unknown = set(overrides) - set(APP_FIELDS)
+            if unknown:
+                raise ParseError("unsupported CraftApp overrides: " + ', '.join(sorted(unknown)))
+            for name, value in overrides.items():
+                values[name] = APP_FIELDS[name](value)
             entry = parts[-1][1:]
         args = call_args(entry, 'app')
-        if len(args) != 6:
-            raise ParseError("app must have six arguments")
+        if len(args) != 5:
+            raise ParseError("app must have five arguments")
         app_id, name, tagline = map(string_value, args[:3])
-        group_tokens = args[3]
-        if len(group_tokens) != 3 or group_tokens[:2] != [('token', 'AppGroup'), ('token', '::')] or group_tokens[2][1] not in ('Classic', 'New'):
-            raise ParseError("unsupported app group")
         colors = []
-        for color in split_top(enclosed(args[4], '[', ']')):
+        for color in split_top(enclosed(args[3], '[', ']')):
             channels = split_top(enclosed(color, '[', ']'))
             if len(channels) != 3:
                 raise ParseError("color must have three channels")
-            values = []
+            channel_values = []
             for channel in channels:
                 if len(channel) != 1 or channel[0][0] != 'token' or not re.fullmatch(r'0x[0-9A-Fa-f_]+|[0-9][0-9_]*', channel[0][1]):
                     raise ParseError("color channel must be an integer literal")
@@ -264,15 +343,19 @@ def parse_suite(tokens):
                 value = int(number, 16 if number.startswith('0x') else 10)
                 if not 0 <= value <= 255:
                     raise ParseError("color channel is outside 0–255")
-                values.append(value)
-            colors.append('#' + ''.join(f'{value:02x}' for value in values))
+                channel_values.append(value)
+            colors.append('#' + ''.join(f'{value:02x}' for value in channel_values))
         if len(colors) != 3:
             raise ParseError("app must have color, ink_light and ink_dark")
+        site = values['site']
+        if site is not None and not site.startswith('https://'):
+            raise ParseError(app_id + ": site must be an https URL")
         apps.append({
-            'id': app_id, 'name': name, 'tagline': tagline, 'group': group_tokens[2][1].lower(),
+            'id': app_id, 'name': name, 'tagline': tagline,
+            'kind': values['kind'], 'publisher': values['publisher'],
             'color': colors[0], 'ink_light': colors[1], 'ink_dark': colors[2],
-            'repository': string_value(args[5]), 'former_ids': former_ids,
-            'website': 'https://getartcraft.com/apps/' + app_id,
+            'repository': string_value(args[4]), 'former_ids': values['former_ids'],
+            'website': site or 'https://getartcraft.com/apps/' + app_id,
         })
     expected = count_calls(body, 'app', '(')
     if len(apps) != expected:
@@ -340,15 +423,36 @@ def json_bytes(value):
 
 
 def download_icon(app_id):
+    """The site's WebP logo, or `None` when the site has no page for this app (community apps)."""
     url = f'https://getartcraft.com/images/apps/{app_id}/icon.webp'
     request = Request(url, headers={'User-Agent': 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'})
-    with urlopen(request, timeout=30) as response:
-        data = response.read(MAX_ICON_BYTES + 1)
+    try:
+        with urlopen(request, timeout=30) as response:
+            data = response.read(MAX_ICON_BYTES + 1)
+    except HTTPError as error:
+        if error.code == 404:
+            return None
+        raise
     if len(data) > MAX_ICON_BYTES:
         raise ValueError(f'{app_id}: icon exceeds 512 KB')
     if len(data) < 12 or data[:4] != b'RIFF' or data[8:12] != b'WEBP':
         raise ValueError(f'{app_id}: downloaded icon is not WebP')
     return data
+
+
+def upstream_icon(source, app):
+    """The PNG icon ArtCraft Launcher embeds, with the licence files it ships for it (a
+    community app's icon is licensed by its publisher: `LICENSE-*-<Name>.txt`)."""
+    icons = source / 'assets/app-icons'
+    data = (icons / (app['id'] + '.png')).read_bytes()
+    if len(data) > MAX_ICON_BYTES:
+        raise ValueError(f"{app['id']}: upstream icon exceeds 512 KB")
+    if not data.startswith(b'\x89PNG\r\n\x1a\n'):
+        raise ValueError(f"{app['id']}: upstream icon is not PNG")
+    files = {app['id'] + '.png': data}
+    for path in sorted(icons.glob(f"LICENSE-*-{app['name']}.txt")):
+        files[path.name] = path.read_bytes()
+    return files
 
 
 def sync(source, destination, icons):
@@ -373,7 +477,6 @@ def sync(source, destination, icons):
         'source': {'repository': REPOSITORY, 'commit': commit,
                    'screenshots_base': constant_string(detail_tokens, 'SCREENSHOTS_BASE'),
                    'screenshots_rev': constant_string(detail_tokens, 'SCREENSHOTS_REV')},
-        'groups': [{'id': 'classic', 'label': 'Classic apps'}, {'id': 'new', 'label': 'New apps'}],
         'apps': apps,
     }
     files = {'catalog.json': json_bytes(catalogue), 'i18n/languages.json': json_bytes(languages)}
@@ -390,8 +493,9 @@ def sync(source, destination, icons):
 Source: {REPOSITORY_URL}
 Commit: `{commit}`
 
-- `catalog.json`: suite order, names, taglines, colours, repositories, former ids,
-  product-page copy and screenshot metadata parsed from the upstream Rust data.
+- `catalog.json`: suite order, names, taglines, colours, publishers (official or
+  community), repositories, former ids, websites, product-page copy and screenshot
+  metadata parsed from the upstream Rust data.
 - `i18n/*.tsv`: upstream translation catalogues, copied byte for byte.
 - `i18n/languages.json`: native language names and plural rule ids from `LANGUAGES`.
 - `LICENSE-MIT`, `LICENSE-APACHE`, and `NOTICE` (when present): upstream licensing
@@ -405,16 +509,23 @@ python3 scripts/sync-craft-launcher.py --ref {commit} --icons
 
 To use an existing checkout instead, replace `--ref {commit}` with
 `--source /path/to/craft-launcher`. Optional app icons are downloaded into
-`host/assets/icons/`; existing icons are never overwritten. Upstream empty
-screenshot lists are preserved, and missing details entries become `null`.
+`host/assets/icons/` from getartcraft.com (WebP); an app without a page there
+(a community app) gets the PNG icon ArtCraft Launcher embeds, with its licence
+files. Existing icons are never overwritten. Upstream empty screenshot lists
+are preserved, and missing details entries become `null`.
 '''.encode('utf-8')
     new_icons = {}
     icons_dir = REPO_ROOT / 'host/assets/icons'
     if icons:
         for app in apps:
-            path = icons_dir / (app['id'] + '.webp')
-            if not path.exists():
-                new_icons[path] = download_icon(app['id'])
+            if any((icons_dir / (app['id'] + ext)).exists() for ext in ('.webp', '.png')):
+                continue
+            data = download_icon(app['id'])
+            if data is not None:
+                new_icons[icons_dir / (app['id'] + '.webp')] = data
+            else:
+                for name, data in upstream_icon(source, app).items():
+                    new_icons[icons_dir / name] = data
     # Parse and fetch everything before touching the destination.
     for name, data in files.items():
         path = destination / name

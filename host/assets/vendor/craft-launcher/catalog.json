@@ -1,26 +1,17 @@
 {
   "source": {
     "repository": "storytold/craft-launcher",
-    "commit": "cbae640688c5fa3daa120a7f5e050f8e24148a47",
+    "commit": "c1d0d881a3a1414556331bab64fb3af14575bd06",
     "screenshots_base": "https://raw.githubusercontent.com/storytold/craft-launcher-assets",
     "screenshots_rev": "v1"
   },
-  "groups": [
-    {
-      "id": "classic",
-      "label": "Classic apps"
-    },
-    {
-      "id": "new",
-      "label": "New apps"
-    }
-  ],
   "apps": [
     {
       "id": "photocraft",
       "name": "PhotoCraft",
       "tagline": "Image editing",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#2f7bf5",
       "ink_light": "#1a5bc4",
       "ink_dark": "#7fb0ff",
@@ -30,7 +21,7 @@
       "details": {
         "headline": "The image editor you already know how to use.",
         "about": [
-          "Layers, masks, adjustment layers, layer styles, type, vectors and brushes in a native app written in Rust. Open source, offline, and yours.",
+          "Layers, masks, adjustment layers, layer styles, type, vectors and brushes in a native app. Open source, offline, and yours.",
           "PhotoCraft keeps the menus, shortcuts and panels your hands already know, so there is nothing to relearn."
         ],
         "features": [
@@ -80,7 +71,8 @@
       "id": "vectorcraft",
       "name": "VectorCraft",
       "tagline": "Vector illustration",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#e8573f",
       "ink_light": "#b83a24",
       "ink_dark": "#ff8a70",
@@ -88,7 +80,7 @@
       "former_ids": [],
       "website": "https://getartcraft.com/apps/vectorcraft",
       "details": {
-        "headline": "Vector illustration, reimagined in pure Rust.",
+        "headline": "Vector illustration, with familiar tools and editable effects.",
         "about": [
           "A native vector illustration app with the pen, panels and shortcuts illustrators expect. Open source, and it also runs in a browser."
         ],
@@ -143,7 +135,8 @@
       "id": "filmcraft",
       "name": "FilmCraft",
       "tagline": "Video editing, color and sound",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#8b5cf6",
       "ink_light": "#6a3fd6",
       "ink_dark": "#b69cff",
@@ -153,7 +146,7 @@
       "details": {
         "headline": "Professional video editing, rebuilt from scratch.",
         "about": [
-          "A native video editor written in pure Rust, with source and program monitors, a real timeline and every trim mode."
+          "A native video editor with source and program monitors, a real timeline and every trim mode."
         ],
         "features": [
           {
@@ -202,7 +195,8 @@
       "id": "lightcraft",
       "name": "LightCraft",
       "tagline": "Photo library and raw development",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#f2a516",
       "ink_light": "#8a5800",
       "ink_dark": "#ffc14d",
@@ -212,7 +206,7 @@
       "details": {
         "headline": "Your photos. Your pixels. Your machine.",
         "about": [
-          "A fast photo library and non-destructive raw developer, written from scratch in pure Rust. No account, no cloud, no telemetry and no subscription."
+          "A fast photo library and non-destructive raw developer. No account, no cloud, no telemetry and no subscription."
         ],
         "features": [
           {
@@ -229,7 +223,7 @@
           },
           {
             "title": "Native raw decoding",
-            "text": "Pure-Rust decoders for the main camera raw formats: DNG, CR2, ARW, NEF, RAF, RW2, PEF and ORF."
+            "text": "Support for the main camera raw formats: DNG, CR2, ARW, NEF, RAF, RW2, PEF and ORF."
           },
           {
             "title": "A library that keeps up",
@@ -265,10 +259,11 @@
       "id": "pdfcraft",
       "name": "PdfCraft",
       "tagline": "Reading, organizing and protecting PDFs",
-      "group": "classic",
-      "color": "#12a58a",
-      "ink_light": "#0a7563",
-      "ink_dark": "#3fd6b8",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#e8204f",
+      "ink_light": "#b70228",
+      "ink_dark": "#f23a62",
       "repository": "storytold/pdfcraft",
       "former_ids": [
         "printcraft"
@@ -277,7 +272,7 @@
       "details": {
         "headline": "The open-source PDF workbench.",
         "about": [
-          "Read, organize, combine, split and secure PDFs in a fast, native app written in Rust from the ground up. No account, no telemetry and no cloud."
+          "Read, organize, combine, split and secure PDFs in a fast, native app. No account, no telemetry and no cloud."
         ],
         "features": [
           {
@@ -313,7 +308,8 @@
       "id": "effectcraft",
       "name": "EffectCraft",
       "tagline": "Motion graphics and visual effects",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#e0368f",
       "ink_light": "#b0206c",
       "ink_dark": "#ff7ab8",
@@ -321,7 +317,7 @@
       "former_ids": [],
       "website": "https://getartcraft.com/apps/effectcraft",
       "details": {
-        "headline": "Motion graphics and visual effects, in pure Rust.",
+        "headline": "Motion graphics and visual effects.",
         "about": [
           "A native compositor with compositions, layers, keyframes, effects, expressions, 3D cameras and lights, and a render queue. Young, moving fast, and already usable."
         ],
@@ -376,7 +372,8 @@
       "id": "designcraft",
       "name": "DesignCraft",
       "tagline": "Page layout and publishing",
-      "group": "classic",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#7bb51c",
       "ink_light": "#457008",
       "ink_dark": "#a6e04a",
@@ -384,7 +381,7 @@
       "former_ids": [],
       "website": "https://getartcraft.com/apps/designcraft",
       "details": {
-        "headline": "Page layout and publishing, rebuilt in pure Rust.",
+        "headline": "Page layout and publishing.",
         "about": [
           "A native layout app with spreads, parent pages, threaded stories, styles, swatches, text wrap and a paragraph composer. No subscription, no license server and no telemetry."
         ],
@@ -424,10 +421,58 @@
       }
     },
     {
+      "id": "figcraft",
+      "name": "FigCraft",
+      "tagline": "Interface design and prototyping",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#02da96",
+      "ink_light": "#047a56",
+      "ink_dark": "#4fe8b6",
+      "repository": "storytold/figcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/figcraft",
+      "details": {
+        "headline": "Interface design and prototyping.",
+        "about": [
+          "Design screens, components and prototypes in a native app that opens instantly and works offline, with no account and no telemetry. Early alpha."
+        ],
+        "features": [
+          {
+            "title": "Auto layout",
+            "text": "Rows, columns, wrap and grids with padding, gaps and Hug, Fill or Fixed sizing, plus constraints and layout grids."
+          },
+          {
+            "title": "Components",
+            "text": "Instances with overrides, variants and properties, styles, and variables with modes bound to fills, strokes and effects."
+          },
+          {
+            "title": "Vectors",
+            "text": "Real vector networks, the pen and pencil, the shape builder, editable booleans and variable width strokes."
+          },
+          {
+            "title": "Prototypes",
+            "text": "Connections, triggers and animated transitions, variables with conditionals, flows and a presentation view with device frames."
+          },
+          {
+            "title": "Hand off",
+            "text": "Inspect mode with measurements, annotations, ready-for-dev status, and code for CSS, HTML, React, SwiftUI and Compose."
+          },
+          {
+            "title": "Your files",
+            "text": "Plain .figcraft files on your own disk. SVG, PNG, JPEG, WebP and PDF in and out, and .fig files open, best effort."
+          }
+        ],
+        "shots": [],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
       "id": "wordcraft",
       "name": "WordCraft",
       "tagline": "Writing and document design",
-      "group": "new",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#3f5fe0",
       "ink_light": "#2a44b8",
       "ink_dark": "#8ea2ff",
@@ -437,7 +482,7 @@
       "details": {
         "headline": "The familiar word processor, native and offline.",
         "about": [
-          "A word processor with the ribbon, shortcuts and behavior you already know, written in Rust. Open source, and built from public specifications."
+          "A word processor with the ribbon, shortcuts and behavior you already know. Open source, and built from public specifications."
         ],
         "features": [
           {
@@ -458,7 +503,7 @@
           },
           {
             "title": "Everywhere",
-            "text": "One Rust codebase for macOS, Windows, Linux, BSD and the web."
+            "text": "Work on macOS, Windows, Linux, BSD and the web."
           },
           {
             "title": "Built for agents",
@@ -487,191 +532,11 @@
       }
     },
     {
-      "id": "deckcraft",
-      "name": "DeckCraft",
-      "tagline": "Presentations and slide shows",
-      "group": "new",
-      "color": "#f07a1e",
-      "ink_light": "#a84f0a",
-      "ink_dark": "#ffa060",
-      "repository": "storytold/deckcraft",
-      "former_ids": [],
-      "website": "https://getartcraft.com/apps/deckcraft",
-      "details": {
-        "headline": "Presentations, rebuilt in Rust.",
-        "about": [
-          "A presentation app with slide masters, shapes, animations and a presenter view, written in Rust. In alpha, heading for beta."
-        ],
-        "features": [
-          {
-            "title": "Make decks",
-            "text": "Slide masters and layouts with placeholders that inherit formatting, themes, sections, notes and comments."
-          },
-          {
-            "title": "Draw",
-            "text": "Preset shapes with adjust handles, connectors that stay glued to shapes, freeform tools, merged shapes, gradients, shadows and glow."
-          },
-          {
-            "title": "Write",
-            "text": "In-place text editing with full font and paragraph formatting, bullets and numbering, columns and autofit."
-          },
-          {
-            "title": "Add content",
-            "text": "Pictures with crop and corrections, styled tables, charts, audio and video."
-          },
-          {
-            "title": "Present",
-            "text": "Transitions including Morph, animations and motion paths, a full-screen slide show, presenter view and rehearsed timings."
-          },
-          {
-            "title": "Exchange files",
-            "text": "Opens and saves PowerPoint .pptx and exports PDF (slides, notes pages and handouts), PNG and JPEG."
-          }
-        ],
-        "shots": [
-          {
-            "key": "editor",
-            "caption": "Editing a slide, with sections and notes"
-          },
-          {
-            "key": "shape",
-            "caption": "The Shape Format tab"
-          },
-          {
-            "key": "sorter",
-            "caption": "The slide sorter"
-          },
-          {
-            "key": "format",
-            "caption": "The Format Shape pane"
-          }
-        ],
-        "platforms": "macOS, Windows, Linux, BSD, web"
-      }
-    },
-    {
-      "id": "gridcraft",
-      "name": "GridCraft",
-      "tagline": "Spreadsheets and data",
-      "group": "new",
-      "color": "#1f9d55",
-      "ink_light": "#12703a",
-      "ink_dark": "#4fd68a",
-      "repository": "storytold/gridcraft",
-      "former_ids": [],
-      "website": "https://getartcraft.com/apps/gridcraft",
-      "details": {
-        "headline": "Spreadsheets you already know how to use.",
-        "about": [
-          "A spreadsheet with the ribbon, formula bar, sheet tabs and shortcuts you know, on a calculation engine written in Rust. No subscription, no license server and no telemetry."
-        ],
-        "features": [
-          {
-            "title": "Familiar",
-            "text": "The ribbon, formula bar, Name Box, fill handle, point-mode formulas, Format Cells, Paste Special, conditional formatting, tables and charts."
-          },
-          {
-            "title": "Compatible",
-            "text": "XLSX is the native format, with formulas, tables, conditional formats, charts, pivot tables and print settings round-tripping. CSV and TSV too."
-          },
-          {
-            "title": "Capable",
-            "text": "A dependency-graph calculation engine with dynamic arrays, LET and LAMBDA, structured table references, sort, AutoFilter and Flash Fill."
-          },
-          {
-            "title": "Fast",
-            "text": "Copy-on-write workbooks, incremental recalculation and a grid that only lays out what is on screen."
-          },
-          {
-            "title": "Agent-native",
-            "text": "Every ribbon button, menu item, dialog and keystroke is a command, available over a JSON control channel, an MCP server or the CLI."
-          },
-          {
-            "title": "Everywhere",
-            "text": "One Rust codebase for the desktop and the web."
-          }
-        ],
-        "shots": [
-          {
-            "key": "hero",
-            "caption": "A quarterly sales dashboard"
-          },
-          {
-            "key": "budget",
-            "caption": "A household budget"
-          },
-          {
-            "key": "pivot",
-            "caption": "A pivot table"
-          },
-          {
-            "key": "chart",
-            "caption": "Formatting a chart"
-          }
-        ],
-        "platforms": "macOS, Windows, Linux, BSD, web"
-      }
-    },
-    {
-      "id": "cadcraft",
-      "name": "CADCraft",
-      "tagline": "Computer-aided design and drafting",
-      "group": "new",
-      "color": "#3ea6e8",
-      "ink_light": "#1a6fa8",
-      "ink_dark": "#7cc8ff",
-      "repository": "storytold/cadcraft",
-      "former_ids": [],
-      "website": "https://getartcraft.com/apps/cadcraft",
-      "details": {
-        "headline": "Computer-aided drafting, in pure Rust.",
-        "about": [
-          "A drafting app with the command line, object snaps and workflow that drafters already know. Free, with no account and no subscription. In early, fast development."
-        ],
-        "features": [
-          {
-            "title": "The workflow you know",
-            "text": "Type L, click two points, type @5<45 and press Enter. Prompts with clickable keywords, polar tracking, direct distance entry and grips work the way drafting habit expects."
-          },
-          {
-            "title": "Open files",
-            "text": "Reads and writes DXF natively (R12 through 2018) and opens and saves DWG (R13 through 2018) with the open-source acadrust library. Exports SVG and PNG."
-          },
-          {
-            "title": "Fast and native",
-            "text": "Pure Rust and egui, with no Electron and no web view."
-          },
-          {
-            "title": "A full drafting toolset",
-            "text": "Draw, modify, dimension, hatch and block commands, layers with a properties manager, paper-space layouts and PDF plotting."
-          },
-          {
-            "title": "Built for agents",
-            "text": "Every menu item, tool and prompt is a command, available over MCP, a JSON control channel or the CLI."
-          }
-        ],
-        "shots": [
-          {
-            "key": "apartment",
-            "caption": "An apartment floor plan"
-          },
-          {
-            "key": "bracket",
-            "caption": "A mechanical bracket drawing"
-          },
-          {
-            "key": "layout",
-            "caption": "A layout sheet"
-          }
-        ],
-        "platforms": "macOS, Windows, Linux, FreeBSD, web"
-      }
-    },
-    {
       "id": "soundcraft",
       "name": "SoundCraft",
       "tagline": "Recording, editing and mixing audio",
-      "group": "new",
+      "kind": "official",
+      "publisher": "ArtCraft",
       "color": "#1fa5c9",
       "ink_light": "#0e7290",
       "ink_dark": "#5fd0ee",
@@ -679,7 +544,7 @@
       "former_ids": [],
       "website": "https://getartcraft.com/apps/soundcraft",
       "details": {
-        "headline": "Recording, editing and mixing, in Rust.",
+        "headline": "Record, edit and mix your audio.",
         "about": [
           "A digital audio workstation that follows the workflow audio engineers already know: an Edit window for arranging and editing, and a Mix window for balancing. Pre-alpha."
         ],
@@ -723,45 +588,222 @@
       }
     },
     {
-      "id": "figcraft",
-      "name": "FigCraft",
-      "tagline": "Interface design and prototyping",
-      "group": "new",
-      "color": "#02da96",
-      "ink_light": "#047a56",
-      "ink_dark": "#4fe8b6",
-      "repository": "storytold/figcraft",
+      "id": "deckcraft",
+      "name": "DeckCraft",
+      "tagline": "Presentations and slide shows",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#f07a1e",
+      "ink_light": "#a84f0a",
+      "ink_dark": "#ffa060",
+      "repository": "storytold/deckcraft",
       "former_ids": [],
-      "website": "https://getartcraft.com/apps/figcraft",
+      "website": "https://getartcraft.com/apps/deckcraft",
       "details": {
-        "headline": "Interface design and prototyping, in pure Rust.",
+        "headline": "Create slides, tell stories and present.",
         "about": [
-          "Design screens, components and prototypes in a native app that opens instantly and works offline, with no account and no telemetry. Early alpha."
+          "A presentation app with slide masters, shapes, animations and a presenter view. In alpha, heading for beta."
         ],
         "features": [
           {
-            "title": "Auto layout",
-            "text": "Rows, columns, wrap and grids with padding, gaps and Hug, Fill or Fixed sizing, plus constraints and layout grids."
+            "title": "Make decks",
+            "text": "Slide masters and layouts with placeholders that inherit formatting, themes, sections, notes and comments."
           },
           {
-            "title": "Components",
-            "text": "Instances with overrides, variants and properties, styles, and variables with modes bound to fills, strokes and effects."
+            "title": "Draw",
+            "text": "Preset shapes with adjust handles, connectors that stay glued to shapes, freeform tools, merged shapes, gradients, shadows and glow."
           },
           {
-            "title": "Vectors",
-            "text": "Real vector networks, the pen and pencil, the shape builder, editable booleans and variable width strokes."
+            "title": "Write",
+            "text": "In-place text editing with full font and paragraph formatting, bullets and numbering, columns and autofit."
           },
           {
-            "title": "Prototypes",
-            "text": "Connections, triggers and animated transitions, variables with conditionals, flows and a presentation view with device frames."
+            "title": "Add content",
+            "text": "Pictures with crop and corrections, styled tables, charts, audio and video."
           },
           {
-            "title": "Hand off",
-            "text": "Inspect mode with measurements, annotations, ready-for-dev status, and code for CSS, HTML, React, SwiftUI and Compose."
+            "title": "Present",
+            "text": "Transitions including Morph, animations and motion paths, a full-screen slide show, presenter view and rehearsed timings."
           },
           {
-            "title": "Your files",
-            "text": "Plain .figcraft files on your own disk. SVG, PNG, JPEG, WebP and PDF in and out, and .fig files open, best effort."
+            "title": "Exchange files",
+            "text": "Opens and saves .pptx presentation files and exports PDF (slides, notes pages and handouts), PNG and JPEG."
+          }
+        ],
+        "shots": [
+          {
+            "key": "editor",
+            "caption": "Editing a slide, with sections and notes"
+          },
+          {
+            "key": "shape",
+            "caption": "The Shape Format tab"
+          },
+          {
+            "key": "sorter",
+            "caption": "The slide sorter"
+          },
+          {
+            "key": "format",
+            "caption": "The Format Shape pane"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "cadcraft",
+      "name": "CADCraft",
+      "tagline": "Computer-aided design and drafting",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#3ea6e8",
+      "ink_light": "#1a6fa8",
+      "ink_dark": "#7cc8ff",
+      "repository": "storytold/cadcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/cadcraft",
+      "details": {
+        "headline": "Computer-aided drafting, with a familiar workflow.",
+        "about": [
+          "A drafting app with the command line, object snaps and workflow that drafters already know. Free, with no account and no subscription. In early, fast development."
+        ],
+        "features": [
+          {
+            "title": "The workflow you know",
+            "text": "Type L, click two points, type @5<45 and press Enter. Prompts with clickable keywords, polar tracking, direct distance entry and grips work the way drafting habit expects."
+          },
+          {
+            "title": "Open files",
+            "text": "Reads and writes DXF natively (R12 through 2018) and opens and saves DWG (R13 through 2018). Exports SVG and PNG."
+          },
+          {
+            "title": "Fast and native",
+            "text": "A responsive, native drafting workspace."
+          },
+          {
+            "title": "A full drafting toolset",
+            "text": "Draw, modify, dimension, hatch and block commands, layers with a properties manager, paper-space layouts and PDF plotting."
+          },
+          {
+            "title": "Built for agents",
+            "text": "Every menu item, tool and prompt is a command, available over MCP, a JSON control channel or the CLI."
+          }
+        ],
+        "shots": [
+          {
+            "key": "apartment",
+            "caption": "An apartment floor plan"
+          },
+          {
+            "key": "bracket",
+            "caption": "A mechanical bracket drawing"
+          },
+          {
+            "key": "layout",
+            "caption": "A layout sheet"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
+      }
+    },
+    {
+      "id": "gridcraft",
+      "name": "GridCraft",
+      "tagline": "Spreadsheets and data",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#1f9d55",
+      "ink_light": "#12703a",
+      "ink_dark": "#4fd68a",
+      "repository": "storytold/gridcraft",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/gridcraft",
+      "details": {
+        "headline": "Spreadsheets you already know how to use.",
+        "about": [
+          "A spreadsheet with the ribbon, formula bar, sheet tabs and shortcuts you know. No subscription, no license server and no telemetry."
+        ],
+        "features": [
+          {
+            "title": "Familiar",
+            "text": "The ribbon, formula bar, Name Box, fill handle, point-mode formulas, Format Cells, Paste Special, conditional formatting, tables and charts."
+          },
+          {
+            "title": "Compatible",
+            "text": "XLSX is the native format, with formulas, tables, conditional formats, charts, pivot tables and print settings round-tripping. CSV and TSV too."
+          },
+          {
+            "title": "Capable",
+            "text": "A dependency-graph calculation engine with dynamic arrays, LET and LAMBDA, structured table references, sort, AutoFilter and Flash Fill."
+          },
+          {
+            "title": "Fast",
+            "text": "Copy-on-write workbooks, incremental recalculation and a grid that only lays out what is on screen."
+          },
+          {
+            "title": "Agent-native",
+            "text": "Every ribbon button, menu item, dialog and keystroke is a command, available over a JSON control channel, an MCP server or the CLI."
+          },
+          {
+            "title": "Everywhere",
+            "text": "Work on the desktop and the web."
+          }
+        ],
+        "shots": [
+          {
+            "key": "hero",
+            "caption": "A quarterly sales dashboard"
+          },
+          {
+            "key": "budget",
+            "caption": "A household budget"
+          },
+          {
+            "key": "pivot",
+            "caption": "A pivot table"
+          },
+          {
+            "key": "chart",
+            "caption": "Formatting a chart"
+          }
+        ],
+        "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "solidcraft",
+      "name": "SolidCraft",
+      "tagline": "Parametric 3D CAD",
+      "kind": "community",
+      "publisher": "Tangency Labs",
+      "color": "#46a1fb",
+      "ink_light": "#1653ae",
+      "ink_dark": "#8cc4ff",
+      "repository": "tangency-labs/solidcraft",
+      "former_ids": [],
+      "website": "https://solidcraft.io",
+      "details": {
+        "headline": "Parametric 3D CAD, with editable sketches and solids.",
+        "about": [
+          "A parametric solid modeller by Tangency Labs. Sketch, constrain and build solids on an editable feature timeline: change a dimension and the model rebuilds. Early, but usable for simple parts. Open source, and it can be driven by AI agents through its MCP server."
+        ],
+        "features": [
+          {
+            "title": "Sketches and constraints",
+            "text": "Lines, arcs, splines and text, solved by SolidCraft's own constraint solver, with parameter-driven dimensions."
+          },
+          {
+            "title": "Features",
+            "text": "Extrude, revolve, sweep, loft, fillet, chamfer, shell, holes, threads and patterns on a parametric timeline."
+          },
+          {
+            "title": "Files",
+            "text": "STEP, IGES, 3MF, STL, OBJ and glTF in and out where supported, and .sc designs."
+          },
+          {
+            "title": "Desktop, web and agents",
+            "text": "A desktop app, a browser app, a headless CLI and an MCP server, all running the same commands."
           }
         ],
         "shots": [],

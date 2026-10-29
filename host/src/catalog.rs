@@ -1,5 +1,6 @@
-//! The Craft App Suite as ArtCraft Launcher describes it: names, taglines, brand colors, groups
-//! and product pages, vendored from storytold/craft-launcher (MIT OR Apache-2.0) by
+//! The Craft App Suite as ArtCraft Launcher describes it: names, taglines, brand colors,
+//! publishers (official ArtCraft apps and approved community apps), repositories and product
+//! pages, vendored from storytold/craft-launcher (MIT OR Apache-2.0) by
 //! `scripts/sync-craft-launcher.py`. Built-in apps take their launcher presentation from here
 //! unless the manifest says otherwise; which apps exist and how they install stays in the
 //! manifest.
@@ -27,7 +28,10 @@ pub struct CatalogApp {
     pub id: String,
     pub name: String,
     pub tagline: String,
-    pub group: String,
+    /// "official" (published by ArtCraft) or "community" (an approved app maintained elsewhere).
+    pub kind: String,
+    /// Who makes it, as the launcher's byline shows it ("ArtCraft", "Tangency Labs").
+    pub publisher: String,
     pub color: String,
     pub ink_light: String,
     pub ink_dark: String,
@@ -91,7 +95,12 @@ mod tests {
         };
         for a in apps {
             assert!(crate::config::valid_id(&a.id), "{}", a.id);
-            assert!(["classic", "new"].contains(&a.group.as_str()), "{}", a.id);
+            assert!(
+                ["official", "community"].contains(&a.kind.as_str()),
+                "{}",
+                a.id
+            );
+            assert!(!a.publisher.trim().is_empty(), "{}", a.id);
             assert!(
                 color(&a.color) && color(&a.ink_light) && color(&a.ink_dark),
                 "{}",

@@ -115,7 +115,8 @@ metadata_url = "https://getartcraft.com/apps"
 interval = "1d"                # at least 1h
 
 # Per-app settings. Built-in apps: photocraft, vectorcraft, filmcraft, lightcraft, pdfcraft,
-# effectcraft, designcraft, wordcraft, deckcraft, gridcraft, cadcraft, soundcraft, figcraft. All are
+# effectcraft, designcraft, wordcraft, deckcraft, gridcraft, cadcraft, soundcraft, figcraft and
+# the community app solidcraft (repository tangency-labs/solidcraft). All are
 # installed unless disabled here or in /admin (the /admin choice takes precedence). Built-in
 # apps accept only the keys shown here.
 #

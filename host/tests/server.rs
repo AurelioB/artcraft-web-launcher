@@ -1647,21 +1647,29 @@ fn launcher_data_release_icons_and_cached_screenshots() {
             &app["release_tag"],
             &app["released"],
             &app["repository"],
-            &app["group"]
+            &app["kind"],
+            &app["publisher"]
         ),
         (
             &"v1.0.0".into(),
             &"2026-10-08T00:00:00Z".into(),
             &"storytold/testcraft".into(),
+            &"".into(),
             &"".into()
         )
     );
     let photo = app_entry(&st, "photocraft").unwrap();
     assert_eq!(
-        (&photo["icon"], &photo["group"], &photo["website"]),
+        (
+            &photo["icon"],
+            &photo["kind"],
+            &photo["publisher"],
+            &photo["website"]
+        ),
         (
             &"launcher/icons/photocraft.webp".into(),
-            &"classic".into(),
+            &"official".into(),
+            &"ArtCraft".into(),
             &"https://getartcraft.com/apps/photocraft".into()
         )
     );
@@ -1763,7 +1771,8 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     gh.put_route(
         "/feed.json",
         feed(&[
-            ("newcraft", "storytold/newcraft", "Newcraft"),
+            // A community app: its repository is not under storytold.
+            ("newcraft", "tangency-labs/newcraft", "Newcraft"),
             ("clashcraft", "storytold/clashcraft", "ClashCraft"),
             ("testcraft", "storytold/testcraft", "Feed TestCraft"),
             ("artcraft-launcher", "storytold/craft-launcher", "Launcher"),
@@ -1778,7 +1787,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
         .collect();
     craft_host::testutil::deflated_zip(&zip_path, &refs);
     gh.publish(
-        "storytold/newcraft",
+        "tangency-labs/newcraft",
         "v1.0.0",
         std::fs::read(&zip_path).unwrap(),
         PublishOpts {
@@ -1800,8 +1809,18 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
     craft_host::daemon::discover(live, Refresh::Scheduled).unwrap();
     let app = status_app(u, "newcraft").expect("discovered app listed");
     assert_eq!(
-        (&app["name"], &app["discovered"], &app["icon"]),
-        (&"Newcraft".into(), &true.into(), &serde_json::Value::Null)
+        (
+            &app["name"],
+            &app["discovered"],
+            &app["icon"],
+            &app["repository"]
+        ),
+        (
+            &"Newcraft".into(),
+            &true.into(),
+            &serde_json::Value::Null,
+            &"tangency-labs/newcraft".into()
+        )
     );
     // The configured app keeps its definition; the colliding one is left out.
     let testcraft = status_app(u, "testcraft").unwrap();
@@ -1852,7 +1871,7 @@ fn apps_discovered_at_run_time_get_metadata_and_install_like_the_others() {
 <script type="application/ld+json">{{"@type":"SoftwareApplication","name":"NewCraft",
  "description":"{description}","url":"{g}/apps/newcraft",{logo}
  "screenshot":["{g}/shots/one.png","{g}/shots/moved.png","{g}/shots/away.png","https://evil.example/x.png"],
- "sameAs":"https://github.com/storytold/newcraft"}}</script>
+ "sameAs":"https://github.com/tangency-labs/newcraft"}}</script>
 </head></html>"#
         )
         .into_bytes()

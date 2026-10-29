@@ -1,10 +1,11 @@
 # Vendored Craft Launcher data
 
 Source: https://github.com/storytold/craft-launcher
-Commit: `cbae640688c5fa3daa120a7f5e050f8e24148a47`
+Commit: `c1d0d881a3a1414556331bab64fb3af14575bd06`
 
-- `catalog.json`: suite order, names, taglines, colours, repositories, former ids,
-  product-page copy and screenshot metadata parsed from the upstream Rust data.
+- `catalog.json`: suite order, names, taglines, colours, publishers (official or
+  community), repositories, former ids, websites, product-page copy and screenshot
+  metadata parsed from the upstream Rust data.
 - `i18n/*.tsv`: upstream translation catalogues, copied byte for byte.
 - `i18n/languages.json`: native language names and plural rule ids from `LANGUAGES`.
 - `LICENSE-MIT`, `LICENSE-APACHE`, and `NOTICE` (when present): upstream licensing
@@ -13,10 +14,12 @@ Commit: `cbae640688c5fa3daa120a7f5e050f8e24148a47`
 Refresh from the repository root with:
 
 ```sh
-python3 scripts/sync-craft-launcher.py --ref cbae640688c5fa3daa120a7f5e050f8e24148a47 --icons
+python3 scripts/sync-craft-launcher.py --ref c1d0d881a3a1414556331bab64fb3af14575bd06 --icons
 ```
 
-To use an existing checkout instead, replace `--ref cbae640688c5fa3daa120a7f5e050f8e24148a47` with
+To use an existing checkout instead, replace `--ref c1d0d881a3a1414556331bab64fb3af14575bd06` with
 `--source /path/to/craft-launcher`. Optional app icons are downloaded into
-`host/assets/icons/`; existing icons are never overwritten. Upstream empty
-screenshot lists are preserved, and missing details entries become `null`.
+`host/assets/icons/` from getartcraft.com (WebP); an app without a page there
+(a community app) gets the PNG icon ArtCraft Launcher embeds, with its licence
+files. Existing icons are never overwritten. Upstream empty screenshot lists
+are preserved, and missing details entries become `null`.

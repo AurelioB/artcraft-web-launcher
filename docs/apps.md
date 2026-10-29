@@ -46,6 +46,23 @@ passed on install):
 - Tag `v0.1.1-rc.5` of PhotoCraft is not flagged as a pre-release on GitHub; the updater treats
   semver pre-release suffixes as pre-releases regardless of the flag.
 
+## SolidCraft (community app)
+
+SolidCraft is published by Tangency Labs, not ArtCraft: ArtCraft Launcher 0.10.0 added it to its
+catalogue as an approved community app, and the ArtCraft release feed does not list it, so it is
+built in rather than discovered. Checked on 29 October 2026 with v0.26.1:
+
+- Repository `tangency-labs/solidcraft`; the web archive follows the suite's naming
+  (`solidcraft-web-{v}.zip`, 33 MB) and is listed in `SHA256SUMS.txt`, which matched, as did the
+  GitHub API digest.
+- One top-level directory `solidcraft-web-<version>/` with `index.html` (relative URLs only),
+  wasm-bindgen glue and one WebAssembly module, `manifest.webmanifest`, `sw.js`, fonts, icons and
+  licence files; no `HOSTING.md` or `_headers`. It installed, passed the archive and serving
+  checks, and loaded under `/solidcraft/`.
+- Like the suite apps it needs WebGPU or WebGL2, so HTTPS (or localhost).
+- Its launcher logo is the 128 px PNG ArtCraft Launcher embeds (getartcraft.com has no page for
+  it), MIT OR Apache-2.0 from the SolidCraft contributors; both licences are served next to it.
+
 ## LightCraft archive contents
 
 `lightcraft-web-0.4.0.zip` contains 572 entries, 549 of which are a Cargo target directory
@@ -63,7 +80,7 @@ EffectCraft registers `sw.js` with scope `./`, i.e. the release directory
 (`/effectcraft/0.6.0/`). Each release therefore has its own service-worker scope; a newer release
 does not take over tabs of an older one. On activation it deletes caches of other EffectCraft
 versions; tabs still on an older release fall back to the network, which keeps serving retained
-releases.
+releases. SolidCraft registers `sw.js` relative to its release directory the same way.
 
 ## Browser storage
 

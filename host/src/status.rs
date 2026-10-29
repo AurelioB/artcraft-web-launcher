@@ -41,8 +41,10 @@ pub struct AppStatus {
     /// Colors for text on light and dark backgrounds, `#rrggbb`, or empty.
     pub ink_light: String,
     pub ink_dark: String,
-    /// Suite group: "classic", "new", or empty for apps outside the Craft App catalogue.
-    pub group: String,
+    /// "official" or "community", or empty for apps outside the Craft App catalogue.
+    pub kind: String,
+    /// Who makes it ("ArtCraft", "Tangency Labs"), or empty outside the catalogue.
+    pub publisher: String,
     /// GitHub `owner/name`.
     pub repository: String,
     /// Product page, or empty.
@@ -205,7 +207,8 @@ pub fn app_status(cfg: &Config, app: &AppConfig, state: &AppState, public: bool)
         color: app.color.clone(),
         ink_light: app.ink_light.clone(),
         ink_dark: app.ink_dark.clone(),
-        group: app.group.clone(),
+        kind: app.kind.clone(),
+        publisher: app.publisher.clone(),
         repository: app.repository.clone(),
         website: app.website.clone(),
         headline: app.headline.clone(),

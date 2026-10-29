@@ -352,6 +352,18 @@ input[type="search"] {
   font-size: 14px;
   line-height: 1.45;
 }
+.byline {
+  margin: 6px 0 0;
+  font: 400 10px var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.byline.official {
+  color: var(--app-ink);
+}
+.byline.community {
+  color: var(--muted);
+}
 .status-pill {
   align-self: flex-start;
   display: inline-block;

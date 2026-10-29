@@ -1,13 +1,14 @@
 //! Runtime discovery of Craft apps that this build does not know yet.
 //!
 //! The ArtCraft release feed (`[discovery] feed_url`, the service ArtCraft Launcher reads) lists
-//! every app of the suite with its repository and latest release. An entry becomes an app here
-//! when its repository is `storytold/<id>` and its latest release has a `<id>-web-<version>.zip`
-//! web archive; installing it then goes through the normal update path (GitHub release lists,
-//! checksums, archive and serving checks). Its launcher presentation comes from the app's page
-//! on the ArtCraft site (`[discovery] metadata_url`/`<id>`): the schema.org `SoftwareApplication`
-//! data for this app (name, description, logo, screenshots) and the page's `og:` title and
-//! description. Only URLs on that site are used, and every download is bounded.
+//! apps with their GitHub repository and latest release. An entry becomes an app here when its
+//! repository is any GitHub `owner/name` (ArtCraft's own `storytold/<id>` or a community
+//! publisher's) and its latest release has a `<id>-web-<version>.zip` web archive; installing it
+//! then goes through the normal update path (GitHub release lists, checksums, archive and serving
+//! checks). Its launcher presentation comes from the app's page on the ArtCraft site
+//! (`[discovery] metadata_url`/`<id>`): the schema.org `SoftwareApplication` data for this app
+//! (name, description, logo, screenshots) and the page's `og:` title and description. Only URLs
+//! on that site are used, and every download is bounded.
 //!
 //! Discovered apps are kept in `STATE_DIR/discovered/apps.json` (logos beside it), so they
 //! survive restarts; apps from the manifest or config.toml always take precedence. The feed is
@@ -23,13 +24,13 @@ use regex::Regex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::config::{Config, valid_id};
+use crate::config::{Config, valid_id, valid_repository};
 use crate::fsutil::{atomic_write, atomic_write_json, read_json};
 use crate::github::{fetch_public, origin_of};
 use crate::timeutil::{now_epoch, now_iso, parse_iso};
 
-/// GitHub owner of every Craft app; the feed's other entries are ignored.
-const OWNER: &str = "storytold";
+/// The feed's entry for ArtCraft Launcher itself, a desktop program rather than a Craft app.
+const LAUNCHER_ID: &str = "artcraft-launcher";
 const MAX_FEED: u64 = 4 << 20;
 const MAX_PAGE: u64 = 2 << 20;
 const MAX_LOGO: u64 = 512 << 10;
@@ -50,7 +51,7 @@ static ATTR: LazyLock<Regex> = LazyLock::new(|| {
 pub struct Discovered {
     pub id: String,
     pub name: String,
-    /// `storytold/<id>`.
+    /// GitHub `owner/name`, as the feed names it.
     pub repository: String,
     /// The page's `og:description`: one line for the launcher.
     pub tagline: String,
@@ -107,6 +108,8 @@ pub struct Refreshed {
 pub struct FeedApp {
     pub id: String,
     pub name: String,
+    /// GitHub `owner/name`.
+    pub repository: String,
 }
 
 pub fn dir(state: &Path) -> PathBuf {
@@ -142,8 +145,8 @@ pub fn next_due(cfg: &Config) -> i64 {
         .map_or_else(now_epoch, |t| t + cfg.discovery.interval_secs as i64)
 }
 
-/// The feed's Craft apps: entries whose repository is `storytold/<id>` and whose latest release
-/// has the web archive `<id>-web-<version>.zip`. Anything else (the launcher itself, desktop-only
+/// The feed's Craft apps: entries with a GitHub `owner/name` repository whose latest release has
+/// the web archive `<id>-web-<version>.zip`. Anything else (the launcher itself, desktop-only
 /// apps, malformed entries) is skipped.
 pub fn parse_feed(feed: &Value) -> Vec<FeedApp> {
     let Some(apps) = feed
@@ -155,7 +158,8 @@ pub fn parse_feed(feed: &Value) -> Vec<FeedApp> {
     let mut out: Vec<FeedApp> = apps
         .iter()
         .filter_map(|(id, entry)| {
-            if !valid_id(id) || entry["repo"].as_str() != Some(&format!("{OWNER}/{id}")) {
+            let repository = entry["repo"].as_str()?;
+            if id == LAUNCHER_ID || !valid_id(id) || !valid_repository(repository) {
                 return None;
             }
             let release = &entry["latest_release"];
@@ -168,6 +172,7 @@ pub fn parse_feed(feed: &Value) -> Vec<FeedApp> {
                 .then(|| FeedApp {
                     id: id.clone(),
                     name: clean(entry["name"].as_str().unwrap_or(id), 60),
+                    repository: repository.to_string(),
                 })
         })
         .collect();
@@ -187,10 +192,10 @@ pub struct PageMeta {
 }
 
 /// Read the schema.org `SoftwareApplication` object describing this app (the one whose `sameAs`
-/// is its GitHub repository or whose `url` is the page; the site's own object is ignored) and the
-/// page's `og:` tags. URLs that are not on `origin` are dropped.
-pub fn parse_page(html: &str, id: &str, page_url: &str, origin: &str) -> PageMeta {
-    let repo_url = format!("https://github.com/{OWNER}/{id}");
+/// is its GitHub `repository` or whose `url` is the page; the site's own object is ignored) and
+/// the page's `og:` tags. URLs that are not on `origin` are dropped.
+pub fn parse_page(html: &str, repository: &str, page_url: &str, origin: &str) -> PageMeta {
+    let repo_url = format!("https://github.com/{repository}");
     let app = JSON_LD
         .captures_iter(html)
         .filter_map(|c| serde_json::from_str::<Value>(c[1].trim()).ok())
@@ -354,15 +359,21 @@ pub fn refresh(cfg: &Config, what: Refresh) -> Result<Option<Refreshed>> {
     apps.retain(|d| !cfg.apps.iter().any(|a| a.id == d.id && !a.discovered));
     let mut changed = apps.len() != before;
     for app in parse_feed(&feed) {
+        // A known app keeps the repository it was discovered with: the feed cannot point an
+        // installed app at another account later.
         if cfg.apps.iter().any(|a| a.id == app.id) || apps.iter().any(|d| d.id == app.id) {
             continue;
         }
-        log::info!("{}: discovered in the ArtCraft feed", app.id);
+        log::info!(
+            "{}: discovered in the ArtCraft feed ({})",
+            app.id,
+            app.repository
+        );
         report.new.push(app.id.clone());
         apps.push(Discovered {
-            repository: format!("{OWNER}/{}", app.id),
             id: app.id,
             name: app.name,
+            repository: app.repository,
             discovered_at: now_iso(),
             ..Discovered::default()
         });
@@ -408,7 +419,7 @@ fn read_page(
             return Ok(false);
         }
     };
-    let meta = parse_page(&html, &app.id, &page_url, origin);
+    let meta = parse_page(&html, &app.repository, &page_url, origin);
     if !meta.name.is_empty() {
         app.name = meta.name;
     }
@@ -469,23 +480,35 @@ mod tests {
     }
 
     #[test]
-    fn only_storytold_apps_with_a_web_archive_qualify() {
+    fn apps_from_any_repository_with_a_web_archive_qualify() {
         let feed = json!({"release_info": {"apps": {
             "figcraft": entry("storytold/figcraft", "0.5.1", &["figcraft-0.5.1-linux.tar.gz", "figcraft-web-0.5.1.zip"]),
-            // The launcher's repository is not storytold/<id>.
-            "artcraft-launcher": entry("storytold/craft-launcher", "0.4.0", &["artcraft-launcher-web-0.4.0.zip"]),
+            // A community app lives under its publisher's account.
+            "solidcraft": entry("tangency-labs/solidcraft", "0.26.1", &["solidcraft-0.26.1-linux-x86_64.AppImage", "solidcraft-web-0.26.1.zip"]),
+            // The launcher is never an app, whatever its release carries.
+            "artcraft-launcher": entry("storytold/craft-launcher", "0.10.0", &["artcraft-launcher-0.10.0-linux-x86_64.AppImage", "artcraft-launcher-web-0.10.0.zip"]),
             "desktoponly": entry("storytold/desktoponly", "1.0.0", &["desktoponly-1.0.0.dmg"]),
             "stale": entry("storytold/stale", "2.0.0", &["stale-web-1.0.0.zip"]),
-            "elsewhere": entry("someone/elsewhere", "1.0.0", &["elsewhere-web-1.0.0.zip"]),
             "Bad_Id": entry("storytold/Bad_Id", "1.0.0", &["Bad_Id-web-1.0.0.zip"]),
+            "noowner": entry("noowner", "1.0.0", &["noowner-web-1.0.0.zip"]),
+            "nested": entry("a/b/nested", "1.0.0", &["nested-web-1.0.0.zip"]),
+            "spaced": entry("some one/spaced", "1.0.0", &["spaced-web-1.0.0.zip"]),
             "broken": {"repo": "storytold/broken"},
         }}});
         assert_eq!(
             parse_feed(&feed),
-            [FeedApp {
-                id: "figcraft".into(),
-                name: "X".into()
-            }]
+            [
+                FeedApp {
+                    id: "figcraft".into(),
+                    name: "X".into(),
+                    repository: "storytold/figcraft".into()
+                },
+                FeedApp {
+                    id: "solidcraft".into(),
+                    name: "X".into(),
+                    repository: "tangency-labs/solidcraft".into()
+                }
+            ]
         );
         assert!(parse_feed(&json!({"success": false})).is_empty());
     }
@@ -506,7 +529,7 @@ mod tests {
     fn page_metadata_comes_from_this_apps_object_and_the_site_only() {
         let meta = parse_page(
             PAGE,
-            "figcraft",
+            "storytold/figcraft",
             "https://getartcraft.com/apps/figcraft",
             "https://getartcraft.com",
         );
@@ -524,7 +547,7 @@ mod tests {
         // A page without this app's data yields nothing rather than the site's.
         let other = parse_page(
             PAGE,
-            "deckcraft",
+            "storytold/deckcraft",
             "https://getartcraft.com/apps/deckcraft",
             "https://getartcraft.com",
         );
@@ -532,7 +555,7 @@ mod tests {
         // Logos off the site are refused.
         let elsewhere = parse_page(
             PAGE,
-            "figcraft",
+            "storytold/figcraft",
             "https://getartcraft.com/apps/figcraft",
             "https://example.net",
         );
