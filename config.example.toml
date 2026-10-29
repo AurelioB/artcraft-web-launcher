@@ -105,6 +105,15 @@ host = ""
 # (<url>/<app>/<key>.jpg, catalogued pictures only) and cached in CACHE_DIR. "" turns them off.
 screenshots_url = "https://raw.githubusercontent.com/storytold/craft-launcher-assets/v1"
 
+# Optional document storage. Disabled by default: no cloud UI, editor hooks or document DB.
+# Requires [auth] methods and apps = "signed-in". Restart after changing this flag.
+# Native Save and server Recents require the documented editor bridge protocol;
+# enabling this flag does not add the protocol to official app binaries.
+[cloud]
+enabled = false
+max_file = "1GiB"
+quota = "10GiB"               # global: all users, versions, pending reservations and orphans
+
 [discovery]
 # New Craft apps are found at run time in the ArtCraft release feed (read once per interval,
 # across restarts) and installed like the built-in ones; their name, description, logo and

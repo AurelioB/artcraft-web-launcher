@@ -6,8 +6,10 @@ up to date.
 
 ![The launcher](docs/images/launcher.webp)
 
-The apps run in the browser. The server only serves their files: it stores no documents, and the
-apps cannot open folders on the server.
+The apps run in the browser. By default the server serves their files and stores no documents.
+An optional, disabled-by-default [document store](docs/cloud-storage.md) adds private per-user
+projects and a floating cloud panel. Native Save and server Recents require compatible editor
+bridges; this option does not add those hooks to official release binaries.
 
 ## Features
 
@@ -71,6 +73,7 @@ change (`docker compose restart host`).
 | `[admin]` | `/admin/` on or off, optional separate host name |
 | `[retention]` | Releases kept per app, archive cache size |
 | `[discovery]` | Finding newly released apps |
+| `[cloud]` | Optional per-user document storage; disabled by default |
 | `[apps.<id>]` | Per app: enable, pin, channel, URL path, own origin; additional apps |
 
 Without a token, update checks share GitHub's limit of 60 API requests per hour per IP address. A
@@ -137,6 +140,7 @@ The binary is `craft-host`. With Compose, run it as `docker compose exec host cr
 - [Users, groups and permissions](docs/permissions.md)
 - [Operations](docs/operations.md): updates, retention, backup and recovery
 - [Apps and browser storage](docs/apps.md)
+- [Optional document storage and editor bridge](docs/cloud-storage.md)
 - [Architecture](docs/architecture.md)
 - [Verification record](docs/verification.md)
 - [Changelog](CHANGELOG.md)

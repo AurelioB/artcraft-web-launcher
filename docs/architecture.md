@@ -93,4 +93,8 @@ sequenceDiagram
   application file is modified; precompressed copies are added alongside.
 - **Separate origins** are a link-level option (`origin`), because the server answers on any host
   name and all apps work under a path prefix.
-- **No document workspace or server-side storage.**
+- **Document storage is opt-in.** The default remains a static app host. With `[cloud] enabled`,
+  `cloud` stores immutable document versions in a separate private state directory and uses the
+  existing authenticated principal on every request. Verified app releases are not modified.
+  A runtime-injected common client connects only to an explicit native editor bridge. See
+  [the storage and bridge contract](cloud-storage.md).

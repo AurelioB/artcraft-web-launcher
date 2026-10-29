@@ -12,7 +12,7 @@ use axum::body::Body;
 use axum::extract::{ConnectInfo, Path, Request, State};
 use axum::http::{HeaderValue, Method, Response, StatusCode, header};
 use axum::middleware::{self, Next};
-use axum::routing::{get, post};
+use axum::routing::{any, get, post};
 
 use crate::activity::Activity;
 use crate::admin::{self, Jobs};
@@ -41,6 +41,7 @@ pub struct Shared {
     pub oidc: Option<Oidc>,
     pub jobs: Jobs,
     pub shots: crate::shots::Shots,
+    pub cloud: Option<Arc<crate::cloud::CloudStore>>,
 }
 
 impl Shared {
@@ -52,6 +53,16 @@ impl Shared {
             .clone()
             .map(|o| Oidc::new(o, cfg.updater.http_timeout_secs));
         Ok(Arc::new(Self {
+            cloud: if cfg.cloud.enabled {
+                Some(Arc::new(crate::cloud::CloudStore::open(
+                    &cfg.paths.state,
+                    cfg.cloud.max_file_bytes,
+                    cfg.cloud.quota_bytes,
+                    cfg.limits.min_free_bytes,
+                )?))
+            } else {
+                None
+            },
             users: UserDb::open(&cfg.paths.state)?,
             sessions: Sessions::default(),
             throttle: Throttle::default(),
@@ -79,8 +90,95 @@ fn static_page(body: &'static str, content_type: &'static str) -> Response<Body>
     res
 }
 
-async fn launcher() -> Response<Body> {
-    static_page(LAUNCHER_HTML, "text/html; charset=utf-8")
+async fn launcher(State(s): State<Arc<Shared>>, req: Request) -> Response<Body> {
+    if s.cfg().cloud.enabled {
+        cloud_page(
+            inject_cloud(LAUNCHER_HTML, "", req.uri().path()),
+            req.method() == Method::HEAD,
+        )
+    } else {
+        static_page(LAUNCHER_HTML, "text/html; charset=utf-8")
+    }
+}
+
+/// Runtime integration is injected only for the opt-in server configuration. Immutable
+/// release files and their published checksums remain untouched.
+fn inject_cloud(html: &str, app: &str, path: &str) -> String {
+    let script = format!(
+        r#"<script defer src="{}__cloud/client.js" data-cloud-enabled="true" data-cloud-app="{}" data-craft-cloud-bootstrap></script>"#,
+        crate::auth::to_root(path),
+        app,
+    );
+    let mut page = html.to_owned();
+    if let Some(at) = html.to_ascii_lowercase().rfind("</head>") {
+        page.insert_str(at, &script);
+    } else {
+        page.push_str(&script);
+    }
+    page
+}
+
+fn cloud_page(page: String, head: bool) -> Response<Body> {
+    let mut res = Response::new(if head {
+        Body::empty()
+    } else {
+        Body::from(page.clone())
+    });
+    res.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/html; charset=utf-8"),
+    );
+    res.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    if let Ok(size) = HeaderValue::from_str(&page.len().to_string()) {
+        res.headers_mut().insert(header::CONTENT_LENGTH, size);
+    }
+    set_common_headers(&mut res);
+    res
+}
+
+async fn cloud_client(State(s): State<Arc<Shared>>) -> Response<Body> {
+    if !s.cfg().cloud.enabled {
+        return simple(StatusCode::NOT_FOUND, "not found\n");
+    }
+    let mut res = static_page(
+        include_str!("../assets/cloud.js"),
+        "text/javascript; charset=utf-8",
+    );
+    res.headers_mut()
+        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res
+}
+
+async fn serve_with_cloud(
+    s: &Shared,
+    app: &AppConfig,
+    root: std::path::PathBuf,
+    rest: &str,
+    req: Request<Body>,
+    policy: CachePolicy,
+) -> Response<Body> {
+    let path = rest.split('?').next().unwrap_or(rest);
+    if s.cfg().cloud.enabled && (req.method() == Method::GET || req.method() == Method::HEAD) {
+        let index = if path.ends_with('/') {
+            format!("{path}index.html")
+        } else {
+            path.to_string()
+        };
+        if index.ends_with(".html")
+            && let Some(file) = release_path(&root, &index)
+            && tokio::fs::metadata(&file)
+                .await
+                .is_ok_and(|m| m.is_file() && m.len() <= 2 << 20)
+            && let Ok(html) = tokio::fs::read_to_string(file).await
+        {
+            return cloud_page(
+                inject_cloud(&html, &app.id, req.uri().path()),
+                req.method() == Method::HEAD,
+            );
+        }
+    }
+    serve_dir(root, rest, req, policy).await
 }
 
 async fn launcher_asset(Path(path): Path<String>) -> Response<Body> {
@@ -240,7 +338,9 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
             // /photocraft/0.5.0/…
             Some(rest) => {
                 s.activity.record(&app.id, Some(first));
-                serve_dir(
+                serve_with_cloud(
+                    &s,
+                    app,
                     root,
                     &format!("/{rest}{query}"),
                     req,
@@ -282,7 +382,7 @@ async fn app_request(State(s): State<Arc<Shared>>, req: Request) -> Response<Bod
     }
     s.activity.record(&app.id, Some(&version));
     let root = releases.join(&version);
-    serve_dir(root, &rest, req, CachePolicy::Current(version)).await
+    serve_with_cloud(&s, app, root, &rest, req, CachePolicy::Current(version)).await
 }
 
 /// /admin answers only when enabled. With `[admin] host`, it lives only on that host name and the
@@ -317,6 +417,9 @@ async fn host_gate(
 pub fn router(shared: Arc<Shared>) -> Router {
     Router::new()
         .route("/", get(launcher))
+        .route("/__cloud/client.js", get(cloud_client))
+        .route("/__cloud/api/config", any(crate::cloud::request))
+        .route("/__cloud/api/{*path}", any(crate::cloud::request))
         .route("/launcher/shots/{app}/{file}", get(launcher_shot))
         .route("/launcher/discovered/{file}", get(discovered_logo))
         .route("/launcher/{*path}", get(launcher_asset))

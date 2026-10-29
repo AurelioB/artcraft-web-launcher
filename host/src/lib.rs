@@ -10,6 +10,7 @@ pub mod assets;
 pub mod auth;
 pub mod candidate;
 pub mod catalog;
+pub mod cloud;
 pub mod config;
 pub mod daemon;
 pub mod discovery;

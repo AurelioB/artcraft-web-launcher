@@ -277,6 +277,7 @@ pub struct Config {
     pub auth: AuthSettings,
     pub admin: AdminSettings,
     pub launcher: LauncherSettings,
+    pub cloud: CloudSettings,
     pub discovery: DiscoverySettings,
     pub apps: Vec<AppConfig>,
     pub config_file_found: bool,
@@ -379,9 +380,43 @@ struct RawFile {
     auth: Option<RawAuth>,
     admin: Option<RawAdmin>,
     launcher: Option<RawLauncher>,
+    cloud: Option<RawCloud>,
     discovery: Option<RawDiscovery>,
     #[serde(default)]
     apps: toml::Table,
+}
+
+/// Optional authenticated, per-user document storage. Never creates storage when disabled.
+#[derive(Debug, Clone)]
+pub struct CloudSettings {
+    pub enabled: bool,
+    pub max_file_bytes: u64,
+    pub quota_bytes: u64,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields)]
+struct RawCloud {
+    enabled: Option<bool>,
+    max_file: Option<Quantity>,
+    quota: Option<Quantity>,
+}
+
+fn build_cloud(raw: RawCloud, problems: &mut Vec<String>) -> CloudSettings {
+    let max_file_bytes = parse_size(raw.max_file, "[cloud] max_file", 1 << 30, problems);
+    let quota_bytes = parse_size(raw.quota, "[cloud] quota", 10 << 30, problems);
+    if max_file_bytes == 0 || quota_bytes == 0 || max_file_bytes > quota_bytes {
+        problems.push("[cloud] max_file and quota must be positive, with max_file <= quota".into());
+    }
+    if max_file_bytes > (1u64 << 40) || quota_bytes > (1u64 << 50) {
+        problems
+            .push("[cloud] max_file must not exceed 1TiB and quota must not exceed 1PiB".into());
+    }
+    CloudSettings {
+        enabled: raw.enabled.unwrap_or(false),
+        max_file_bytes,
+        quota_bytes,
+    }
 }
 
 #[derive(Deserialize, Default)]
@@ -1233,6 +1268,15 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         &admin,
         &mut problems,
     );
+    let cloud = build_cloud(raw.cloud.unwrap_or_default(), &mut problems);
+    if cloud.enabled
+        && (matches!(auth.sign_in, crate::access::SignIn::None)
+            || !matches!(auth.apps, crate::access::AppsAccess::SignedIn))
+    {
+        problems.push(
+            "[cloud] enabled requires an [auth] sign-in method and apps = \"signed-in\"".into(),
+        );
+    }
     let launcher = build_launcher(raw.launcher.unwrap_or_default(), &mut problems);
     let discovery = build_discovery(raw.discovery.unwrap_or_default(), &mut problems);
     if !problems.is_empty() {
@@ -1262,6 +1306,7 @@ pub fn load_config(paths: Paths) -> Result<Config, ConfigError> {
         auth,
         admin,
         launcher,
+        cloud,
         discovery,
         apps,
         config_file_found: found,
@@ -1405,6 +1450,20 @@ mod tests {
         std::fs::create_dir_all(dir.join("config")).unwrap();
         std::fs::write(&p.config_file, text).unwrap();
         load_config(p)
+    }
+
+    #[test]
+    fn document_storage_is_off_by_default_and_requires_sign_in_when_enabled() {
+        assert!(!load("").unwrap().cloud.enabled);
+        assert!(!load("[cloud]\nenabled = false\n").unwrap().cloud.enabled);
+        assert!(load("[cloud]\nenabled = true\n").is_err());
+        let cfg = load("[auth]\nmethods = [\"local\"]\napps = \"signed-in\"\n[cloud]\nenabled = true\nmax_file = \"8MiB\"\nquota = \"32MiB\"\n").unwrap();
+        assert!(cfg.cloud.enabled);
+        assert_eq!(cfg.cloud.max_file_bytes, 8 << 20);
+        assert_eq!(cfg.cloud.quota_bytes, 32 << 20);
+        assert!(load("[cloud]\nmax_file = 0\n").is_err());
+        assert!(load("[cloud]\nmax_file = \"20GiB\"\nquota = \"10GiB\"\n").is_err());
+        assert!(load("[cloud]\nunknown_option = true\n").is_err());
     }
 
     #[test]

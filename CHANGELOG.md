@@ -3,6 +3,15 @@
 All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- Optional authenticated, per-user document storage with resumable uploads, immutable versions,
+  conflict detection and a shared draggable cloud panel. Disabled by default under `[cloud]`.
+  Native Save and server Recents require the documented editor bridge protocol;
+  official app binaries remain unchanged.
+
 ## [0.5.0] - 2026-10-29
 
 ### Added
