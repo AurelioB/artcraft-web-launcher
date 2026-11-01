@@ -3,6 +3,14 @@
 All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.3] - 2026-11-01
+
+### Fixed
+
+- A GitHub quota recorded without a token no longer holds back scheduled checks after a token
+  is added (and the other way round): the token's quota and the address's anonymous one are
+  separate budgets.
+
 ## [0.5.2] - 2026-11-01
 
 ### Changed
@@ -209,6 +217,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.5.3]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.3
 [0.5.2]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.2
 [0.5.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.1
 [0.5.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.0
