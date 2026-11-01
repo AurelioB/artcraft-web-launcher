@@ -212,7 +212,7 @@ container first.
 | Situation | Behaviour | Visible as |
 | --- | --- | --- |
 | GitHub unreachable / HTTP 5xx | bounded retries, then retry with backoff | `discover` error; apps keep serving |
-| Rate limit (403/429) | waits until GitHub's reset time | `discover`: rate limit; configure a token |
+| Rate limit (403/429) | scheduled checks wait until GitHub's reset time; without a token they already pause at 10 requests left | nothing for scheduled checks (logged as skipped); a manual check reports `discover`: rate limit |
 | No matching artifact / ambiguous artifacts | release skipped | `status --json`: `skipped` notes |
 | Checksum mismatch or missing | release skipped, retried later | `checksum` error, `failed_versions` |
 | Unsafe archive / unexpected layout | release rejected | `archive` or `validate` error |

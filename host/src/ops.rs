@@ -275,14 +275,40 @@ impl<'a> Updater<'a> {
         }
     }
 
+    /// A scheduled check that waits for GitHub's quota window to reset instead of failing:
+    /// nothing is recorded as an error, and the app is due again at `reset`.
+    fn defer(
+        &self,
+        app: &AppConfig,
+        state: &mut AppState,
+        reset: i64,
+        left: u32,
+    ) -> Result<Outcome> {
+        state.retry_after = Some(reset);
+        self.store.save(&app.id, state)?;
+        Ok(Outcome::Skipped(format!(
+            "GitHub API quota: {left} requests left until {}; checking then",
+            crate::timeutil::iso(reset)
+        )))
+    }
+
     fn update_app_inner(&self, app: &AppConfig, manual: bool) -> Result<Outcome> {
         let mut state = self.store.load(&app.id)?;
         let now = now_epoch();
         if !manual && let Some(at) = state.retry_after.filter(|t| *t > now) {
             return Ok(Outcome::Skipped(format!(
-                "waiting until {} after earlier failures",
+                "waiting until {} (earlier failures or GitHub's API quota)",
                 crate::timeutil::iso(at)
             )));
+        }
+        // A scheduled check leaves GitHub's last requests of the window alone (without a token:
+        // for manual checks and other clients on this address).
+        if !manual
+            && let Ok(gh) = self.gh()
+            && let Some(q) = gh.quota()
+            && q.remaining <= self.cfg.scheduled_reserve()
+        {
+            return self.defer(app, &mut state, q.reset_epoch, q.remaining);
         }
         let pin = self.effective_pin(app, &state);
         let outcome = match self.discover(app, &mut state, pin.is_some()) {
@@ -290,6 +316,9 @@ impl<'a> Updater<'a> {
                 // Offline or rate limited: an installed pin can still be activated.
                 if let Some(p) = pin.as_ref().filter(|p| state.installed.contains_key(*p)) {
                     self.activate_installed(app, &mut state, p, true)?
+                } else if !manual && let Some(reset) = e.retry_at {
+                    // Rate limited: a scheduled check waits for the reset, not an error.
+                    return self.defer(app, &mut state, reset, 0);
                 } else {
                     Outcome::Failed(e)
                 }
@@ -317,7 +346,7 @@ impl<'a> Updater<'a> {
                 state.consecutive_failures += 1;
                 let backoff =
                     60u64.saturating_mul(1 << state.consecutive_failures.min(10).saturating_sub(1));
-                let delay = backoff.min(self.cfg.updater.check_interval_secs) as i64;
+                let delay = backoff.min(self.cfg.check_interval_secs()) as i64;
                 state.retry_after = Some(e.retry_at.unwrap_or(now + delay));
                 state.last_error = Some(Failure {
                     at: now_iso(),

@@ -282,7 +282,7 @@ pub fn build(cfg: &Config, store: &Store, public: bool) -> Status {
             version: env!("CARGO_PKG_VERSION"),
             heartbeat_at: hb.as_ref().map(|h| h.at.clone()),
             phase: hb.map(|h| h.phase),
-            check_interval_seconds: cfg.updater.check_interval_secs,
+            check_interval_seconds: cfg.check_interval_secs(),
         },
         launcher: LauncherStatus {
             screenshots: cfg.launcher.screenshots_url.is_some(),

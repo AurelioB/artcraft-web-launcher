@@ -188,6 +188,32 @@ struct CachedList {
     releases: Vec<Release>,
 }
 
+/// GitHub's API quota as its last response reported it (`x-ratelimit-*` headers). It is kept in
+/// the API cache, so the server and CLI commands sharing the cache see the same budget.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Quota {
+    pub limit: u32,
+    pub remaining: u32,
+    /// When the window resets (epoch seconds).
+    pub reset_epoch: i64,
+}
+
+impl Quota {
+    fn of(resp: &ureq::http::Response<ureq::Body>) -> Option<Quota> {
+        fn header<T: std::str::FromStr>(
+            resp: &ureq::http::Response<ureq::Body>,
+            k: &str,
+        ) -> Option<T> {
+            resp.headers().get(k)?.to_str().ok()?.trim().parse().ok()
+        }
+        Some(Quota {
+            limit: header(resp, "x-ratelimit-limit")?,
+            remaining: header(resp, "x-ratelimit-remaining")?,
+            reset_epoch: header(resp, "x-ratelimit-reset")?,
+        })
+    }
+}
+
 pub struct GitHub {
     settings: UpdaterSettings,
     token: Option<String>,
@@ -391,7 +417,34 @@ impl GitHub {
         })
     }
 
-    /// List recent releases. Conditional requests make unchanged lists cost no API quota.
+    fn quota_file(&self) -> PathBuf {
+        self.api_cache.join("quota.json")
+    }
+
+    fn record_quota(&self, resp: &ureq::http::Response<ureq::Body>) {
+        if let Some(q) = Quota::of(resp)
+            && let Err(e) = atomic_write_json(&self.quota_file(), &q)
+        {
+            log::warn!("cannot record the GitHub API quota: {e:#}");
+        }
+    }
+
+    /// The API quota GitHub last reported for the current window, or `None` when unknown or
+    /// the window has reset since.
+    pub fn quota(&self) -> Option<Quota> {
+        read_json::<Quota>(&self.quota_file())
+            .ok()
+            .flatten()
+            .filter(|q| q.reset_epoch > now_epoch())
+    }
+
+    pub fn has_token(&self) -> bool {
+        self.token.is_some()
+    }
+
+    /// List recent releases: one API request. Unchanged lists come from the cache through a
+    /// conditional request; with a token GitHub does not count such a 304 against the quota,
+    /// without one it does.
     pub fn list_releases(&self, repository: &str) -> Result<Vec<Release>, NetError> {
         let url = format!(
             "{}/repos/{repository}/releases?per_page=50",
@@ -421,6 +474,7 @@ impl GitHub {
                 Ok(r) => r,
                 Err(e) => return Attempt::Retry(e.to_string()),
             };
+            self.record_quota(&resp);
             if resp.status().as_u16() == 304
                 && let Some(c) = &cached
             {

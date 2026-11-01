@@ -56,9 +56,11 @@ sudo install -m 0640 -o "$RUN_UID" -g "$RUN_GID" config.example.toml /srv/craft-
 ### GitHub token
 
 Optional, but recommended: it raises the API limit from 60 to 5000 requests per hour, and
-unchanged release lists then cost no quota. Without one, hourly checks use one request per app
-(13 with the built-in apps), and the 60 are shared by everything behind the same public IP
-address. A fine-grained token with read-only access to public repositories is enough:
+unchanged release lists then cost no quota. Without one, each check uses one request per app
+(15 with the built-in apps), and the 60 are shared by everything behind the same public IP
+address: scheduled checks then use at most 30 per hour (the interval stretches with many apps)
+and pause while GitHub reports 10 or fewer left. A fine-grained token with read-only access to
+public repositories is enough:
 
 ```sh
 install -m 0400 -o "$RUN_UID" /dev/stdin /srv/craft-apps/config/github-token <<<"github_pat_…"

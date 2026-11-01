@@ -20,6 +20,15 @@ pub const MANIFEST: &str = include_str!("manifest.toml");
 pub const STAGING_DIR: &str = ".staging";
 /// Paths the server answers itself; an app entry must not shadow them.
 pub const RESERVED_ENTRIES: &[&str] = &["admin", "auth", "launcher", "healthz", "readyz", "status"];
+/// GitHub's API limit without a token: 60 requests per hour per IP address, conditional (304)
+/// requests included, shared with every other unauthenticated client behind that address.
+pub const ANONYMOUS_LIMIT_PER_HOUR: u64 = 60;
+/// Without a token, scheduled checks are spread so they need at most this many requests per
+/// hour (one per app per check), half of GitHub's limit.
+pub const ANONYMOUS_SCHEDULED_PER_HOUR: u64 = 30;
+/// Without a token, scheduled checks wait for the next window once GitHub reports this many
+/// requests or fewer left, keeping them for manual checks and other clients on the address.
+pub const ANONYMOUS_RESERVE: u32 = 10;
 
 #[derive(Debug)]
 pub struct ConfigError(pub Vec<String>);
@@ -315,6 +324,28 @@ impl Config {
 
     pub fn enabled_apps(&self) -> impl Iterator<Item = &AppConfig> {
         self.apps.iter().filter(|a| self.is_enabled(a))
+    }
+
+    /// Time between two scheduled checks of an app. With a token it is `[updater]
+    /// check_interval`; without one it is stretched, if needed, so that a check of every
+    /// enabled app fits in [`ANONYMOUS_SCHEDULED_PER_HOUR`] requests.
+    pub fn check_interval_secs(&self) -> u64 {
+        let configured = self.updater.check_interval_secs;
+        if self.token_path().is_some() {
+            return configured;
+        }
+        let apps = self.enabled_apps().count() as u64;
+        configured.max((apps * 3600).div_ceil(ANONYMOUS_SCHEDULED_PER_HOUR))
+    }
+
+    /// Requests GitHub must still have left in the current window for a scheduled check to
+    /// run: none with a token, [`ANONYMOUS_RESERVE`] without one.
+    pub fn scheduled_reserve(&self) -> u32 {
+        if self.token_path().is_some() {
+            0
+        } else {
+            ANONYMOUS_RESERVE
+        }
     }
 
     pub fn app(&self, id: &str) -> Result<&AppConfig, ConfigError> {
@@ -1490,6 +1521,46 @@ mod tests {
         assert_eq!(word.artifact_patterns, ["wordcraft-web-{version}.zip"]);
         assert_eq!(word.website, "https://getartcraft.com/apps/wordcraft");
         assert_eq!(cfg.updater.check_interval_secs, 3600);
+    }
+
+    #[test]
+    fn without_a_token_checks_fit_in_githubs_anonymous_limit() {
+        let extra = |n: usize| {
+            (0..n)
+                .map(|i| format!("[apps.extra{i}]\nname = \"Extra {i}\"\n"))
+                .collect::<String>()
+        };
+        // The 15 built-in apps: one request each per hour stays under 30 per hour.
+        let cfg = load("").unwrap();
+        assert_eq!(cfg.check_interval_secs(), 3600);
+        assert_eq!(cfg.scheduled_reserve(), ANONYMOUS_RESERVE);
+        // 45 apps hourly would need 45 requests: every app is checked every 90 minutes instead.
+        let cfg = load(&extra(30)).unwrap();
+        assert_eq!(cfg.enabled_apps().count(), 45);
+        assert_eq!(cfg.check_interval_secs(), 45 * 120);
+        // Disabled apps cost nothing; a longer configured interval is kept.
+        let cfg = load(&format!(
+            "[updater]\ncheck_interval = \"3h\"\n{}",
+            extra(30)
+        ))
+        .unwrap();
+        assert_eq!(cfg.check_interval_secs(), 3 * 3600);
+        // A token lifts both: the configured interval and no reserve.
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("token"), "t").unwrap();
+        let cfg = load_in(
+            dir.path(),
+            &format!(
+                "[updater]\ncheck_interval = \"10m\"\ngithub_token_file = \"{}\"\n{}",
+                dir.path().join("token").display(),
+                extra(30)
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            (cfg.check_interval_secs(), cfg.scheduled_reserve()),
+            (600, 0)
+        );
     }
 
     #[test]

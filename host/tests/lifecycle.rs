@@ -949,3 +949,104 @@ fn restarts_and_retries_only_query_github_for_apps_that_are_due() {
     cycle(&e.cfg, &u, true);
     assert_eq!(gh.hits(&route), after_install + 2);
 }
+
+#[test]
+fn scheduled_checks_leave_githubs_last_requests_alone() {
+    use craft_host::daemon::cycle;
+    let gh = FakeGitHub::start();
+    let e = env_with(
+        &gh,
+        "",
+        "min_free_space = 0",
+        "[apps.othercraft]\nname = \"OtherCraft\"\nrepository = \"storytold/othercraft\"\n",
+    );
+    gh.publish(
+        REPO,
+        "v1.0.0",
+        release_zip(&e.root(), "1.0.0", &[]),
+        PublishOpts::default(),
+    );
+    gh.set_releases("storytold/othercraft", Vec::new());
+    let (test_route, other_route) = (
+        format!("/repos/{REPO}/releases"),
+        "/repos/storytold/othercraft/releases".to_string(),
+    );
+    let reset = 4_102_444_800;
+    let quota = |status: Option<u16>, remaining: u32| Behavior {
+        status,
+        headers: vec![
+            ("X-RateLimit-Limit".into(), "60".into()),
+            ("X-RateLimit-Remaining".into(), remaining.to_string()),
+            ("X-RateLimit-Reset".into(), reset.to_string()),
+        ],
+        ..Default::default()
+    };
+    let u = Updater::new(&e.cfg);
+    u.prepare().unwrap();
+    let outcomes = |manual: bool| -> Vec<(String, (&'static str, String))> {
+        cycle(&e.cfg, &u, manual)
+            .iter()
+            .map(|(id, o)| (id.clone(), kind(o)))
+            .collect()
+    };
+
+    // Without a token, GitHub reporting 10 requests left (the reserve) stops the round: the
+    // first app is checked, the next waits for the window to reset without an error.
+    gh.behave(&test_route, quota(None, 10));
+    let round = outcomes(false);
+    assert_eq!(round[0], ("testcraft".into(), installed("1.0.0")));
+    assert_eq!(round[1].0, "othercraft");
+    assert_eq!(round[1].1.0, "skipped");
+    assert!(round[1].1.1.contains("10 requests left"), "{round:?}");
+    assert_eq!(gh.hits(&other_route), 0);
+    let other = u.store.load("othercraft").unwrap();
+    assert_eq!(
+        (other.retry_after, other.last_error.is_none()),
+        (Some(reset), true)
+    );
+    // Manual checks may use the reserve.
+    outcomes(true);
+    assert_eq!(gh.hits(&other_route), 1);
+
+    // The recorded quota still applies: the next scheduled round asks GitHub nothing.
+    for id in ["testcraft", "othercraft"] {
+        let mut st = u.store.load(id).unwrap();
+        st.retry_after = None;
+        st.last_check_ok = Some(false);
+        u.store.save(id, &st).unwrap();
+    }
+    let before = (gh.hits(&test_route), gh.hits(&other_route));
+    outcomes(false);
+    assert_eq!((gh.hits(&test_route), gh.hits(&other_route)), before);
+
+    // A new window (the recorded quota expired), but GitHub refuses the scheduled check: it
+    // waits for the reset instead of failing, and the rest of the round asks GitHub nothing.
+    std::fs::remove_file(e.cfg.paths.cache.join("api/quota.json")).unwrap();
+    for id in ["testcraft", "othercraft"] {
+        let mut st = u.store.load(id).unwrap();
+        st.retry_after = None;
+        st.last_check_ok = Some(false);
+        u.store.save(id, &st).unwrap();
+    }
+    gh.behave(&test_route, quota(Some(403), 0));
+    gh.behave(&other_route, quota(None, 60));
+    let before = (gh.hits(&test_route), gh.hits(&other_route));
+    let round = outcomes(false);
+    assert!(round.iter().all(|(_, (k, _))| *k == "skipped"), "{round:?}");
+    assert_eq!(
+        (gh.hits(&test_route), gh.hits(&other_route)),
+        (before.0 + 1, before.1)
+    );
+    let test = u.store.load("testcraft").unwrap();
+    assert_eq!(
+        (
+            test.retry_after,
+            test.last_error.is_none(),
+            test.consecutive_failures
+        ),
+        (Some(reset), true, 0)
+    );
+    assert_eq!(e.served_version().as_deref(), Some("1.0.0"));
+    // A manual update still reports the refusal.
+    assert_failed(&update(&e), "discover", "rate limit");
+}

@@ -59,8 +59,9 @@ pub fn cycle(cfg: &Config, updater: &Updater, manual: bool) -> Vec<(String, Outc
 /// after failures (backoff, or GitHub's rate-limit reset).
 pub fn due_at(cfg: &Config, st: &AppState, now: i64) -> i64 {
     let base = match (st.last_check_ok, st.last_check.as_deref()) {
-        (Some(true), Some(at)) => crate::timeutil::parse_iso(at)
-            .map_or(now, |t| t + cfg.updater.check_interval_secs as i64),
+        (Some(true), Some(at)) => {
+            crate::timeutil::parse_iso(at).map_or(now, |t| t + cfg.check_interval_secs() as i64)
+        }
         _ => now,
     };
     base.max(st.retry_after.unwrap_or(i64::MIN))
@@ -73,7 +74,7 @@ fn earliest_due(cfg: &Config, store: &Store, now: i64) -> i64 {
             Err(_) => now,
         })
         .min()
-        .unwrap_or(now + cfg.updater.check_interval_secs as i64)
+        .unwrap_or(now + cfg.check_interval_secs() as i64)
 }
 
 fn next_run(cfg: &Config, store: &Store) -> i64 {
@@ -88,7 +89,7 @@ fn next_run(cfg: &Config, store: &Store) -> i64 {
 pub fn first_run(cfg: &Config, store: &Store) -> i64 {
     let now = now_epoch();
     if !cfg.updater.check_on_startup {
-        return now + cfg.updater.check_interval_secs as i64;
+        return now + cfg.check_interval_secs() as i64;
     }
     earliest_due(cfg, store, now).max(now)
 }
@@ -182,6 +183,18 @@ fn updater_loop(live: Arc<LiveConfig>, activity: Arc<Activity>, phase: Arc<Mutex
     // once.
     let mut next_discovery = discovery_round(&live);
     let cfg = live.get();
+    if cfg.token_path().is_none() {
+        log::info!(
+            "no GitHub token: each of the {} apps is checked every {} min, at most {} of the {} \
+             API requests per hour GitHub allows this address; scheduled checks wait for the next \
+             window when {} or fewer are left (set [updater] github_token_file to raise the limit)",
+            cfg.enabled_apps().count(),
+            cfg.check_interval_secs().div_ceil(60),
+            crate::config::ANONYMOUS_SCHEDULED_PER_HOUR,
+            crate::config::ANONYMOUS_LIMIT_PER_HOUR,
+            crate::config::ANONYMOUS_RESERVE,
+        );
+    }
     let mut next = first_run(&cfg, &Store::new(&cfg.paths.state));
     if next > now_epoch() {
         log::info!(

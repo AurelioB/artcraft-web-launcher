@@ -18,14 +18,14 @@ ArtCraft Web Launcher (the `craft-host` binary) combines its compiled-in [app ma
 | Key | Type; default | Meaning and validation |
 | --- | --- | --- |
 | `check_on_startup` | bool; `true` | Continue the persisted check schedule: apps never checked or already due are checked promptly. `false` waits a full interval after startup. |
-| `check_interval` | duration; `"1h"` (3600s) | Interval for scheduled checks; at least 60s. |
+| `check_interval` | duration; `"1h"` (3600s) | Interval for scheduled checks; at least 60s. Without `github_token_file` it is stretched, if needed, to 2 minutes per enabled app, so scheduled checks need at most 30 of the 60 API requests per hour GitHub allows an IP address without a token (45 apps: every 90 minutes). |
 | `http_timeout` | duration; `"30s"` | GitHub API request timeout (also used by doctor/OIDC connectivity); greater than zero. |
 | `download_timeout` | duration; `"15m"` | Archive-download request timeout; greater than zero. |
 | `max_retries` | u32; `3` | Additional attempts for retryable network requests; at most 10. |
 | `retry_backoff` | duration; `"5s"` | Initial retry delay. |
 | `retry_backoff_max` | duration; `"5m"` | Maximum retry delay. |
 | `github_api_url` | string; `"https://api.github.com"` | Base URL of GitHub-compatible API; must start with `http://` or `https://`. |
-| `github_token_file` | string; `""` | Optional readable token file for GitHub API authentication. Empty disables it; relative paths resolve against `CONFIG_DIR`, absolute paths are accepted. The token is not logged. |
+| `github_token_file` | string; `""` | Optional readable token file for GitHub API authentication. Empty disables it; relative paths resolve against `CONFIG_DIR`, absolute paths are accepted. The token is not logged. Without a token, scheduled checks also stop for the rest of GitHub's rate-limit window once it reports 10 or fewer requests left (shared by every unauthenticated client on the IP address), leaving them for manual checks; with one they run until the quota is used up. Either way, a scheduled check that GitHub refuses for the rate limit waits for the reset instead of reporting an error. |
 | `activation` | string; `"immediate"` | `"immediate"` makes new installations active for new visitors at once; `"idle"` waits for the app to receive no requests for `idle_after`. Existing tabs retain their release URLs, but idle detection cannot see activity that generates no requests. Per-app override available. |
 | `idle_after` | duration; `"30m"` | Quiet period for idle activation; per-app override available. |
 | `heartbeat_interval` | duration; `"30s"` | Interval for updater heartbeat writes; greater than zero. |

@@ -74,8 +74,9 @@ change (`docker compose restart host`).
 | `[discovery]` | Finding newly released apps |
 | `[apps.<id>]` | Per app: enable, pin, channel, URL path, own origin; additional apps |
 
-Without a token, update checks share GitHub's limit of 60 API requests per hour per IP address. A
-read-only token raises it; see [GitHub token](docs/install.md#github-token).
+Without a token, update checks share GitHub's limit of 60 API requests per hour per IP address:
+scheduled checks then use at most half of it and pause when 10 or fewer are left. A read-only
+token raises the limit to 5000; see [GitHub token](docs/install.md#github-token).
 
 The full list is in the [configuration reference](docs/configuration.md).
 

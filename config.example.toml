@@ -13,7 +13,7 @@ trusted_proxies = []           # e.g. ["172.16.0.0/12"]
 # Continue the schedule on startup: apps whose last successful check is older than
 # check_interval (or that never had one) are checked at once. false: wait a full interval.
 check_on_startup = true
-check_interval = "1h"          # at least 60s
+check_interval = "1h"          # at least 60s; without a token at least 2 min per enabled app
 http_timeout = "30s"
 download_timeout = "15m"
 max_retries = 3                # per request, with exponential backoff
@@ -22,8 +22,10 @@ retry_backoff_max = "5m"
 github_api_url = "https://api.github.com"
 # Optional token: raises the API limit from 60 to 5000 requests per hour, and unchanged release
 # lists then cost no quota. Without one, every check counts against the 60 per hour shared by
-# everything on this public IP address. Relative paths resolve in CONFIG_DIR; absolute paths
-# are also accepted. Keep the file readable only by the server. The token is never logged.
+# everything on this public IP address, so scheduled checks use at most 30 per hour (the
+# interval stretches with many apps) and pause while GitHub reports 10 or fewer left.
+# Relative paths resolve in CONFIG_DIR; absolute paths are also accepted. Keep the file readable
+# only by the server. The token is never logged.
 github_token_file = ""
 # When a downloaded release goes live at the app's URL: "immediate", or "idle" = once the app
 # has received no requests for `idle_after`. A tab opened before the switch keeps its page but
