@@ -3,6 +3,21 @@
 All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.2] - 2026-11-01
+
+### Changed
+
+- Without a GitHub token, the defaults now fit GitHub's limit of 60 API requests per hour per IP
+  address, which other unauthenticated clients behind the same address share:
+  - scheduled checks need at most 30 requests per hour: `check_interval` is stretched to at
+    least 2 minutes per enabled app (unchanged for the 15 built-in apps at the default `1h`);
+  - scheduled checks pause for the rest of the window once GitHub reports 10 or fewer requests
+    left, keeping them for manual checks and other clients.
+- A scheduled check that GitHub refuses for its rate limit waits for the reset instead of
+  recording an error, and the rest of that round no longer asks GitHub. The quota GitHub reports
+  is kept in the API cache, so the server and CLI commands share it. Manual checks still report
+  the refusal.
+
 ## [0.5.1] - 2026-11-01
 
 ### Added
@@ -194,6 +209,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.5.2]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.2
 [0.5.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.1
 [0.5.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.0
 [0.4.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.4.0
