@@ -3,6 +3,27 @@
 All notable changes to ArtCraft Web Launcher (formerly Craft Apps Host) are documented here.
 This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.5.1] - 2026-11-01
+
+### Added
+
+- **Craft Anything** (`storytold/craft-anything`), added to the ArtCraft Launcher catalogue in
+  its 0.12.0, is built in and serves at `/craft-anything/`. The ArtCraft release feed does not
+  list it yet, so discovery could not find it.
+
+### Fixed
+
+- EffectCraft 0.19.0 failed validation ("sw.js references "/effectcraft-config.json" with a
+  root-absolute URL") and stayed on 0.18.0. Its service worker only compares request paths with
+  that name to leave an optional config file alone; literals passed to `endsWith`,
+  `startsWith`, `includes`, `indexOf` or `lastIndexOf` are no longer treated as asset
+  references. Root-absolute paths that are requested are still refused.
+
+### Changed
+
+- The vendored ArtCraft Launcher catalogue and translations are refreshed to upstream
+  `ffa3440`; the sync script reads its new `mac_team` field.
+
 ## [0.5.0] - 2026-10-29
 
 ### Added
@@ -173,6 +194,7 @@ This project follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Administration can be restricted to a separate host name; sign-in and proxy identity headers are subject to configured host and trusted-proxy boundaries.
 - Container deployment uses a non-root, read-only distroless runtime without privileged mode or a Docker socket.
 
+[0.5.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.1
 [0.5.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.5.0
 [0.4.0]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.4.0
 [0.3.1]: https://github.com/AurelioB/artcraft-web-launcher/releases/tag/v0.3.1
