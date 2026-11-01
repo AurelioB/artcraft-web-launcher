@@ -255,10 +255,16 @@ def app_kind(tokens):
     return tokens[2][1].lower()
 
 
-def boolean(tokens):
-    if tokens not in ([('token', 'true')], [('token', 'false')]):
-        raise ParseError("expected a Rust boolean literal")
-    return tokens[0][1] == 'true'
+def optional_constant(tokens):
+    """`None`, or `Some(…)` holding a string literal or the name of a constant (macOS team ids
+    such as `ARTCRAFT_TEAM_ID`). The host does not use the value; parsing it keeps a changed
+    type from passing silently."""
+    if tokens == [('token', 'None')]:
+        return None
+    args = call_args(tokens, 'Some')
+    if len(args) != 1 or len(args[0]) != 1 or args[0][0][0] not in ('string', 'token'):
+        raise ParseError("expected None, Some(\"…\") or Some(CONSTANT)")
+    return args[0][0][1]
 
 
 # CraftApp fields the catalogue reads (the others are still parsed, so a changed type fails
@@ -272,7 +278,7 @@ APP_FIELDS = {
     'bundle': optional_string,
     'former_bundles': string_array,
     'site': optional_string,
-    'installs_on_mac': boolean,
+    'mac_team': optional_constant,
 }
 
 

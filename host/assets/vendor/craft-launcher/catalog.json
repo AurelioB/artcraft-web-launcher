@@ -1,7 +1,7 @@
 {
   "source": {
     "repository": "storytold/craft-launcher",
-    "commit": "c1d0d881a3a1414556331bab64fb3af14575bd06",
+    "commit": "ffa3440c153f08c015f23ebcf9dfe0ec8025d0aa",
     "screenshots_base": "https://raw.githubusercontent.com/storytold/craft-launcher-assets",
     "screenshots_rev": "v1"
   },
@@ -769,6 +769,45 @@
           }
         ],
         "platforms": "macOS, Windows, Linux, BSD, web"
+      }
+    },
+    {
+      "id": "craft-anything",
+      "name": "Craft Anything",
+      "tagline": "Find out how any software works, then craft your own",
+      "kind": "official",
+      "publisher": "ArtCraft",
+      "color": "#4e7bfb",
+      "ink_light": "#1659c4",
+      "ink_dark": "#74aaff",
+      "repository": "storytold/craft-anything",
+      "former_ids": [],
+      "website": "https://getartcraft.com/apps/craft-anything",
+      "details": {
+        "headline": "See how any website, app or game works, then build your own.",
+        "about": [
+          "Point it at a target and say what you want. It studies the original with real inspection tools, has a coding agent build a new project in the stack you ask for, checks the result against the original and refines it. Open source and clean-room."
+        ],
+        "features": [
+          {
+            "title": "Study anything",
+            "text": "Websites, desktop apps, phone apps, games and files: find out how they're built, with the evidence behind every answer."
+          },
+          {
+            "title": "Build your own",
+            "text": "Say what you want and a coding agent builds a new project in the language or engine you name."
+          },
+          {
+            "title": "Checked, not guessed",
+            "text": "Every build is compared with the original, at three screen widths for a page, and refined until it's close."
+          },
+          {
+            "title": "Agent-ready",
+            "text": "Every tool is a CLI command and an MCP tool, and no AI is needed just to inspect."
+          }
+        ],
+        "shots": [],
+        "platforms": "macOS, Windows, Linux, FreeBSD, web"
       }
     },
     {

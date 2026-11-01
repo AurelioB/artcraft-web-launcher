@@ -147,9 +147,35 @@ fn resolve(root: &Path, base_dir: &Path, reference: &str) -> Option<PathBuf> {
     Some(parts.iter().collect())
 }
 
+/// String methods whose argument is compared with a URL rather than requested, e.g. EffectCraft
+/// 0.19.0's `sw.js` skipping its optional config file with
+/// `url.pathname.endsWith("/effectcraft-config.json")`.
+const COMPARISONS: &[&str] = &[
+    "endsWith",
+    "startsWith",
+    "includes",
+    "indexOf",
+    "lastIndexOf",
+];
+
+/// Whether the literal that follows `before` is the argument of `.<comparison>(`.
+fn is_comparison_operand(before: &str) -> bool {
+    let Some(call) = before.trim_end().strip_suffix('(') else {
+        return false;
+    };
+    let call = call.trim_end();
+    COMPARISONS.iter().any(|m| {
+        call.strip_suffix(m)
+            .is_some_and(|object| object.trim_end().ends_with('.'))
+    })
+}
+
+/// Quoted asset paths in `text`: the files a page or service worker may request. Literals that
+/// are only compared with URLs are not requests and are left out.
 pub fn references(text: &str) -> Vec<String> {
     let mut refs: Vec<String> = REF_RE
         .captures_iter(text)
+        .filter(|c| !is_comparison_operand(&text[..c.get(0).unwrap().start()]))
         .map(|c| c[1].to_string())
         .collect();
     refs.sort();
@@ -533,6 +559,43 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(e.contains("outside the release"), "{e}");
+    }
+
+    #[test]
+    fn literals_compared_with_urls_are_not_references() {
+        // EffectCraft 0.19.0: the service worker leaves an optional, absent config file alone.
+        let sw = br#"self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  if (url.pathname.endsWith("/effectcraft-config.json")) return;
+  if (url.pathname .startsWith ( '/api/x.json' )) return;
+  importScripts("./worker.js");
+});"#;
+        let d = site(&[
+            ("index.html", INDEX),
+            ("app.js", b"x"),
+            ("app_bg.wasm", b"\0asm\x01\0\0\0"),
+            ("sw.js", sw),
+            ("worker.js", b"x"),
+        ]);
+        let r = validate_tree(d.path(), "", 1 << 30).unwrap();
+        assert_eq!(r.references, ["app.js", "app_bg.wasm", "worker.js"]);
+        // A request for the same path is still refused, also as a call named like a method.
+        for sw in [
+            &b"importScripts('/effectcraft-config.json')"[..],
+            b"fetch(\"/effectcraft-config.json\")",
+            b"endsWith(\"/effectcraft-config.json\")",
+        ] {
+            let d = site(&[
+                ("index.html", INDEX),
+                ("app.js", b"x"),
+                ("app_bg.wasm", b"\0asm"),
+                ("sw.js", sw),
+            ]);
+            let e = validate_tree(d.path(), "", 1 << 30)
+                .unwrap_err()
+                .to_string();
+            assert!(e.contains("root-absolute"), "{e}");
+        }
     }
 
     #[test]

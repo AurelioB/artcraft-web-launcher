@@ -46,6 +46,13 @@ passed on install):
 - Tag `v0.1.1-rc.5` of PhotoCraft is not flagged as a pre-release on GitHub; the updater treats
   semver pre-release suffixes as pre-releases regardless of the flag.
 
+## Craft Anything
+
+Added to the ArtCraft Launcher catalogue in its 0.12.0 (1 November 2026); the ArtCraft release
+feed does not list it yet, so it is built in. Its ID has a hyphen: it serves at
+`/craft-anything/` from `storytold/craft-anything` (`craft-anything-web-{v}.zip`). Checked with
+v0.2.0: checksum, archive and serving checks passed, and it loaded under its path prefix.
+
 ## SolidCraft (community app)
 
 SolidCraft is published by Tangency Labs, not ArtCraft: ArtCraft Launcher 0.10.0 added it to its
@@ -81,6 +88,15 @@ EffectCraft registers `sw.js` with scope `./`, i.e. the release directory
 does not take over tabs of an older one. On activation it deletes caches of other EffectCraft
 versions; tabs still on an older release fall back to the network, which keeps serving retained
 releases. SolidCraft registers `sw.js` relative to its release directory the same way.
+
+The validator checks every quoted asset path in `index.html` and `sw.js` (it must be relative and
+exist in the release). A literal that is only the argument of a string comparison
+(`endsWith`, `startsWith`, `includes`, `indexOf`, `lastIndexOf`) is not a request and is not
+checked: EffectCraft 0.19.0's `sw.js` uses `url.pathname.endsWith("/effectcraft-config.json")`
+to leave its optional startup config alone. The page fetches that file relative to itself
+(`/effectcraft/effectcraft-config.json`); the release does not ship one, so EffectCraft opens
+with its default startup project. This is a heuristic: a root-absolute literal used in any
+other way still fails validation.
 
 ## Browser storage
 

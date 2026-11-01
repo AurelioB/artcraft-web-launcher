@@ -108,6 +108,10 @@ const LAUNCHER: &[(&str, Asset)] = &[
         asset!("icons/figcraft.webp", "image/webp"),
     ),
     (
+        "icons/craft-anything.webp",
+        asset!("icons/craft-anything.webp", "image/webp"),
+    ),
+    (
         "icons/solidcraft.png",
         asset!("icons/solidcraft.png", "image/png"),
     ),

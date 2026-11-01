@@ -1427,10 +1427,28 @@ mod tests {
                 "cadcraft",
                 "soundcraft",
                 "figcraft",
+                "craft-anything",
                 "solidcraft"
             ]
         );
-        assert_eq!(cfg.enabled_apps().count(), 14);
+        assert_eq!(cfg.enabled_apps().count(), 15);
+        let anything = cfg.app("craft-anything").unwrap();
+        assert_eq!(
+            (
+                anything.name.as_str(),
+                anything.repository.as_str(),
+                anything.entry.as_str()
+            ),
+            (
+                "Craft Anything",
+                "storytold/craft-anything",
+                "craft-anything"
+            )
+        );
+        assert_eq!(
+            anything.artifact_patterns,
+            ["craft-anything-web-{version}.zip"]
+        );
         // A community app installs from its publisher's repository with the suite's naming.
         let solid = cfg.app("solidcraft").unwrap();
         assert_eq!(

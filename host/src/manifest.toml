@@ -64,5 +64,8 @@ notes = "Plays audio through WebAudio; no cross-origin isolation headers needed.
 
 [apps.figcraft]
 
+[apps.craft-anything]
+notes = "In the ArtCraft Launcher catalogue since 0.12.0; not yet listed in the ArtCraft release feed."
+
 [apps.solidcraft]
 notes = "Community app by Tangency Labs (tangency-labs/solidcraft), in the ArtCraft Launcher catalogue since 0.10.0. Ships a service worker (sw.js)."

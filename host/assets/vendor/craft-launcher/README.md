@@ -1,7 +1,7 @@
 # Vendored Craft Launcher data
 
 Source: https://github.com/storytold/craft-launcher
-Commit: `c1d0d881a3a1414556331bab64fb3af14575bd06`
+Commit: `ffa3440c153f08c015f23ebcf9dfe0ec8025d0aa`
 
 - `catalog.json`: suite order, names, taglines, colours, publishers (official or
   community), repositories, former ids, websites, product-page copy and screenshot
@@ -14,10 +14,10 @@ Commit: `c1d0d881a3a1414556331bab64fb3af14575bd06`
 Refresh from the repository root with:
 
 ```sh
-python3 scripts/sync-craft-launcher.py --ref c1d0d881a3a1414556331bab64fb3af14575bd06 --icons
+python3 scripts/sync-craft-launcher.py --ref ffa3440c153f08c015f23ebcf9dfe0ec8025d0aa --icons
 ```
 
-To use an existing checkout instead, replace `--ref c1d0d881a3a1414556331bab64fb3af14575bd06` with
+To use an existing checkout instead, replace `--ref ffa3440c153f08c015f23ebcf9dfe0ec8025d0aa` with
 `--source /path/to/craft-launcher`. Optional app icons are downloaded into
 `host/assets/icons/` from getartcraft.com (WebP); an app without a page there
 (a community app) gets the PNG icon ArtCraft Launcher embeds, with its licence
