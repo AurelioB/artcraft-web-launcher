@@ -196,10 +196,14 @@ pub struct Quota {
     pub remaining: u32,
     /// When the window resets (epoch seconds).
     pub reset_epoch: i64,
+    /// Whether it is a token's quota or the IP address's anonymous one: they are separate
+    /// budgets, so a quota seen before a token was added or removed does not apply.
+    #[serde(default)]
+    pub authenticated: bool,
 }
 
 impl Quota {
-    fn of(resp: &ureq::http::Response<ureq::Body>) -> Option<Quota> {
+    fn of(resp: &ureq::http::Response<ureq::Body>, authenticated: bool) -> Option<Quota> {
         fn header<T: std::str::FromStr>(
             resp: &ureq::http::Response<ureq::Body>,
             k: &str,
@@ -210,6 +214,7 @@ impl Quota {
             limit: header(resp, "x-ratelimit-limit")?,
             remaining: header(resp, "x-ratelimit-remaining")?,
             reset_epoch: header(resp, "x-ratelimit-reset")?,
+            authenticated,
         })
     }
 }
@@ -422,20 +427,21 @@ impl GitHub {
     }
 
     fn record_quota(&self, resp: &ureq::http::Response<ureq::Body>) {
-        if let Some(q) = Quota::of(resp)
+        if let Some(q) = Quota::of(resp, self.token.is_some())
             && let Err(e) = atomic_write_json(&self.quota_file(), &q)
         {
             log::warn!("cannot record the GitHub API quota: {e:#}");
         }
     }
 
-    /// The API quota GitHub last reported for the current window, or `None` when unknown or
-    /// the window has reset since.
+    /// The API quota GitHub last reported for the current window and the current
+    /// authentication, or `None` when unknown, the window has reset since, or it was seen with
+    /// (or without) a token that is no longer (or now) configured.
     pub fn quota(&self) -> Option<Quota> {
         read_json::<Quota>(&self.quota_file())
             .ok()
             .flatten()
-            .filter(|q| q.reset_epoch > now_epoch())
+            .filter(|q| q.reset_epoch > now_epoch() && q.authenticated == self.token.is_some())
     }
 
     pub fn has_token(&self) -> bool {
@@ -759,5 +765,49 @@ mod tests {
         assert_eq!(parsed[1].0, "other.zip");
         assert_eq!(parsed[1].1, h);
         assert_eq!(parsed.len(), 2);
+    }
+
+    #[test]
+    fn a_recorded_quota_applies_to_its_window_and_authentication_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let settings = UpdaterSettings::default();
+        let anonymous = GitHub::new(&settings, None, dir.path());
+        let with_token = GitHub::new(&settings, Some("t".into()), dir.path());
+        let record = |q: Quota| atomic_write_json(&dir.path().join("api/quota.json"), &q).unwrap();
+        let exhausted = Quota {
+            limit: 60,
+            remaining: 0,
+            reset_epoch: now_epoch() + 600,
+            authenticated: false,
+        };
+        assert_eq!(anonymous.quota(), None, "nothing recorded yet");
+        record(exhausted);
+        assert_eq!(anonymous.quota(), Some(exhausted));
+        // The address's anonymous quota says nothing about a token that was added since.
+        assert_eq!(with_token.quota(), None);
+        // Nor does a token's quota about anonymous requests after the token was removed.
+        record(Quota {
+            authenticated: true,
+            ..exhausted
+        });
+        assert_eq!(anonymous.quota(), None);
+        assert!(with_token.quota().is_some());
+        // A window that has reset no longer applies; records from before this field count as
+        // anonymous.
+        record(Quota {
+            reset_epoch: now_epoch() - 1,
+            ..exhausted
+        });
+        assert_eq!(anonymous.quota(), None);
+        std::fs::write(
+            dir.path().join("api/quota.json"),
+            format!(
+                "{{\"limit\":60,\"remaining\":0,\"reset_epoch\":{}}}",
+                now_epoch() + 600
+            ),
+        )
+        .unwrap();
+        assert_eq!(anonymous.quota().map(|q| q.authenticated), Some(false));
+        assert_eq!(with_token.quota(), None);
     }
 }
